@@ -54,7 +54,7 @@ principaux (à connaître par cœur, ce sont tes « organes »).
 | `/mavros/param/set` | `mavros_msgs/srv/ParamSet` | régler un paramètre |
 
 > Astuce : pour explorer ce qui existe, dans le conteneur :
-> `docker compose exec ros bash -lc "ros2 topic list"` et `... "ros2 service list"`.
+> `docker compose exec sim bash -lc "ros2 topic list"` et `... "ros2 service list"`.
 
 ---
 
@@ -129,7 +129,7 @@ modèle, copie le dossier, renomme partout `obstacle_avoid` en `ton_nom`.
 
 ```bash
 docker compose restart ros            # reconstruit (rapide) et relance la stack
-docker compose exec ros bash -lc "ros2 run ton_package ton_noeud_node"
+docker compose exec sim bash -lc "ros2 run ton_package ton_noeud_node"
 ```
 
 > Le `restart` refait `colcon build` grâce au montage du volume, donc ton code est
@@ -145,11 +145,11 @@ Séquence type (dans un terminal, pendant que la simulation tourne) :
 ```bash
 # 1) être sûr que le drone est au sol, désarmé, en STABILIZE
 # 2) lancer ton script (il commence à publier des consignes)
-docker compose exec ros bash -lc "ros2 run obstacle_avoid obstacle_avoid_node"
+docker compose exec sim bash -lc "ros2 run obstacle_avoid obstacle_avoid_node"
 
 # 3) armer puis passer en OFFBOARD (via les services du nœud exemple)
-docker compose exec ros bash -lc "ros2 service call /obstacle_avoid/arm std_srvs/srv/SetBool '{data: true}'"
-docker compose exec ros bash -lc "ros2 service call /obstacle_avoid/offboard std_srvs/srv/SetBool '{data: true}'"
+docker compose exec sim bash -lc "ros2 service call /obstacle_avoid/arm std_srvs/srv/SetBool '{data: true}'"
+docker compose exec sim bash -lc "ros2 service call /obstacle_avoid/offboard std_srvs/srv/SetBool '{data: true}'"
 ```
 
 Règles d'or d'ArduPilot en OFFBOARD :
@@ -184,11 +184,11 @@ un terminal pour tester le comportement sans capteur ni monde Gazebo :
 
 ```bash
 # envoie un obstacle à 1 m (le drone doit reculer)
-docker compose exec ros bash -lc \
+docker compose exec sim bash -lc \
   "ros2 topic pub -r 10 /range/forward sensor_msgs/msg/Range '{range: 1.0, min_range: 0.1, max_range: 10.0}'"
 
 # puis éloigne l'obstacle à 20 m (le drone doit repartir en avant)
-docker compose exec ros bash -lc \
+docker compose exec sim bash -lc \
   "ros2 topic pub -r 10 /range/forward sensor_msgs/msg/Range '{range: 20.0, min_range: 0.1, max_range: 10.0}'"
 ```
 
