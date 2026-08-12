@@ -22,23 +22,29 @@ cd drone-sim
 pip install -r dji\requirements.txt
 ```
 
-## 3. Premier lancement (plusieurs minutes : les images se construisent)
+## 3. Premier lancement
 
 ```bat
 scripts\start.bat
 ```
 
-Docker Desktop doit être démarré. Le premier `docker compose up -d --build` compile
-ArduPilot SITL et le plugin Gazebo : **10 à 30 min** selon la machine. Les lancements
-suivants sont immédiats.
+Docker Desktop doit être démarré. `start.bat` **télécharge l'image pré-construite**
+(publiée sur ghcr.io) : quelques minutes selon la connexion, pas de compilation.
+Les lancements suivants sont immédiats.
 
-Vérifier que les deux conteneurs tournent :
+> Si l'image pré-construite n'est pas disponible (dépôt privé, ou pas encore
+> publiée), `start.bat` **construit l'image localement** en repli : **10 à 30 min**
+> selon la machine et le réseau. Pour forcer une reconstruction locale :
+> `set REBUILD=1` avant `scripts\start.bat`.
+
+Vérifier que le conteneur tourne :
 
 ```bat
 docker compose ps
 ```
 
-Vous devez voir `drone-sim` et `drone-ros` en statut `Up`.
+Vous devez voir **`drone-sim`** en statut `Up` (un seul conteneur : SITL + Gazebo
++ ROS2 + MAVROS + nodes y tournent ensemble).
 
 ## 4. Piloter avec la RC-N1
 
@@ -80,8 +86,21 @@ Une fenêtre 3D s'ouvre : le drone iris dans le monde simulé.
 - La vue 3D **complète QGC** : QGC pour les paramètres/courbes, Gazebo pour le
   comportement physique concret.
 
-> Linux / WSL2 : rien à installer, `scripts\start_gui.sh` suffit (WSLg affiche la
+> Linux / WSL2 : rien à installer, `scripts/start_gui.sh` suffit (WSLg affiche la
 > fenêtre). Si la fenêtre est noire, essayer `export LIBGL_ALWAYS_SOFTWARE=1`.
+
+## GPU ou CPU (rendu 3D)
+
+Le simulateur détecte automatiquement le matériel — **rien à configurer** :
+
+| Machine | Rendu 3D | Détail |
+|---|---|---|
+| **Windows** (Docker Desktop) | **CPU** (software) | L'accélération GPU OpenGL de Gazebo n'est pas disponible sous Docker Desktop. Le CPU suffit largement pour le TP PID. |
+| **Linux sans GPU NVIDIA** | **CPU** (software) | Fonctionne partout. |
+| **Linux + GPU NVIDIA** | **GPU** (matériel) | Activé automatiquement par `start.sh` si `nvidia-smi` **et** le [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/) sont présents. |
+
+> La **physique** (SITL, le PID) tourne sur CPU dans tous les cas ; le GPU
+> n'accélère que la **vue 3D**. Une machine sans GPU fait tourner le TP sans souci.
 
 ## 7. Arrêter
 

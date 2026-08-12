@@ -29,6 +29,7 @@ if errorlevel 1 (
 echo Lancement de la vue 3D Gazebo (gzclient)...
 echo   - Modele : le drone iris dans le monde simule
 echo   - Regle un PID trop faible en D dans QGC et observe l'oscillation en 3D.
-docker compose exec -e DISPLAY=127.0.0.1:0 -e LIBGL_ALWAYS_SOFTWARE=1 sim gzclient
+REM Rendu CPU (software) sous Windows : hérité du conteneur (LIBGL_ALWAYS_SOFTWARE=1).
+docker compose exec -e DISPLAY=127.0.0.1:0 sim gzclient
 
 endlocal

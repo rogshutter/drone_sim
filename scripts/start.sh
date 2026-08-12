@@ -70,9 +70,35 @@ fi
 COMPOSE_FILES="-f docker-compose.yml"
 [ -f docker-compose.linux.yml ] && COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.linux.yml"
 
+# --- 5) Détection GPU : accélération 3D si carte NVIDIA + runtime Docker nvidia ---
+# Sinon on reste en rendu CPU (software), qui marche sur toutes les machines.
+if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+    if docker info 2>/dev/null | grep -qiE 'Runtimes:.*nvidia|nvidia'; then
+        COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.gpu.yml"
+        echo "GPU NVIDIA détecté : accélération 3D activée."
+    else
+        echo "GPU NVIDIA présent mais le runtime Docker 'nvidia' n'est pas configuré."
+        echo "  -> rendu CPU (installez nvidia-container-toolkit pour l'accélération). Voir docs/INSTALL.md."
+    fi
+else
+    echo "Pas de GPU NVIDIA détecté : rendu 3D en CPU (software)."
+fi
+
 echo "[1/3] Docker vérifié (Engine Linux)."
-echo "[2/3] Construction et démarrage des conteneurs (premier lancement : plusieurs minutes)..."
-docker compose $COMPOSE_FILES up -d --build
+# Image pré-construite d'abord (téléchargement), build local en repli.
+# REBUILD=1 force la reconstruction locale (après modif du code du conteneur).
+if [ "${REBUILD:-0}" = "1" ]; then
+    echo "[2/3] REBUILD=1 : construction locale de l'image..."
+    docker compose $COMPOSE_FILES up -d --build
+else
+    echo "[2/3] Récupération de l'image pré-construite (ghcr.io)..."
+    if docker compose $COMPOSE_FILES pull sim; then
+        echo "      Image pré-construite récupérée."
+    else
+        echo "      Image pré-construite indisponible : construction locale (plusieurs minutes)..."
+    fi
+    docker compose $COMPOSE_FILES up -d
+fi
 
 echo "[3/3] Simulation lancée !"
 echo

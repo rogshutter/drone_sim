@@ -3,6 +3,12 @@ name: drone-sim
 services:
   # --- Simulateur moderne : SITL + Gazebo Harmonic + RViz + MAVROS + nodes ---
   sim:
+    # Image pré-construite (publiée par GitHub Actions sur ghcr.io). Les scripts
+    # start.sh / start.bat tentent d'abord `docker compose pull` : les étudiants
+    # TÉLÉCHARGENT l'image au lieu de la compiler (build très long + dépôts
+    # GitHub parfois lents). Si le pull échoue, `build:` ci-dessous reconstruit
+    # localement. Surchargeable via la variable d'env SIM_IMAGE.
+    image: ${SIM_IMAGE:-ghcr.io/rogshutter/drone_sim:latest}
     build:
       context: .          # racine du projet : le Dockerfile référence sim/ et ros/
       dockerfile: sim/Dockerfile
@@ -20,4 +26,8 @@ services:
     environment:
       - DISPLAY=${DISPLAY:-}                 # vue 3D (RViz/Gazebo) via VcXsrv
       - GZ_SIM_RESOURCE_PATH=/sim/models:/sim/worlds
+      # Rendu CPU par défaut (software / llvmpipe) : marche partout, sans GPU.
+      # L'overlay docker-compose.gpu.yml remet cette valeur à 0 quand un GPU
+      # NVIDIA est détecté sous Linux (accélération matérielle de la 3D).
+      - LIBGL_ALWAYS_SOFTWARE=1
     restart: unless-stopped

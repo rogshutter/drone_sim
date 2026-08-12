@@ -21,8 +21,17 @@ if not defined DOCKER_OK (
     if errorlevel 1 goto waitdocker
 )
 
-echo [2/3] Construction et démarrage des conteneurs (premier lancement : plusieurs minutes)...
-docker compose up -d --build
+REM Sous Windows / Docker Desktop, le rendu 3D reste en CPU (pas d'acceleration
+REM GPU OpenGL possible pour Gazebo) : on n'utilise QUE le compose de base.
+REM REBUILD=1 force la reconstruction locale au lieu de telecharger l'image.
+if "%REBUILD%"=="1" (
+    echo [2/3] REBUILD=1 : construction locale de l'image ^(plusieurs minutes^)...
+    docker compose up -d --build
+) else (
+    echo [2/3] Recuperation de l'image pre-construite ^(ghcr.io^)...
+    docker compose pull sim
+    docker compose up -d
+)
 if errorlevel 1 (
     echo.
     echo [31mECHEC du build. Regarde l'erreur ci-dessus puis relance.
