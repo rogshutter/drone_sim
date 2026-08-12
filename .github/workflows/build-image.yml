@@ -70,4 +70,4 @@ jobs:
         run: |
           echo "Image publiée : ${{ steps.img.outputs.name }}:latest" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "⚠️ Rendez le package **public** (Packages -> drone_sim -> Package settings -> Change visibility) pour que les étudiants puissent le tirer sans authentification." >> "$GITHUB_STEP_SUMMARY"
+          echo "IMPORTANT : rendez le package **public** (Packages -> drone_sim -> Package settings -> Change visibility) pour que les étudiants puissent le tirer sans authentification." >> "$GITHUB_STEP_SUMMARY"

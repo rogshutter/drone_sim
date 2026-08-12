@@ -30,8 +30,8 @@ démarre ET coupe les moteurs) :
 
 | État du drone | Geste « V » | Effet |
 |---|---|---|
-| **Au sol** (désarmé) | ✋ maintenir ~1,2 s | **Arme + décolle** à `takeoff_alt` (2,5 m), puis passe en `LOITER` |
-| **En vol** | ✋ maintenir ~1,2 s | **Atterrit** (mode `LAND`) puis se désarme tout seul |
+| **Au sol** (désarmé) | maintenir ~1,2 s | **Arme + décolle** à `takeoff_alt` (2,5 m), puis passe en `LOITER` |
+| **En vol** | maintenir ~1,2 s | **Atterrit** (mode `LAND`) puis se désarme tout seul |
 
 > Un délai anti-rebond (`gesture_cooldown_s`, 3 s) évite les double-déclenchements.
 
@@ -75,7 +75,31 @@ comme une DJI.
 
 ---
 
-## 5. Prérequis simulateur
+## 5. Calibration de la RC (avant de piloter)
+
+Un centre qui dérive ferait avancer le drone tout seul et déclencherait mal le
+geste « V ». On calibre donc la RC **avant** de commencer.
+
+Au **premier** `run_dji`, la calibration se lance automatiquement. Sinon :
+
+```bash
+python dji/dji_host.py --calibrate
+```
+
+Deux étapes :
+1. **Centre** : lâcher tous les sticks, ne rien toucher (mesure ~2 s).
+2. **Butées** : bouger tous les sticks ET la molette dans toutes les directions
+   pendant 6 s.
+
+Le résultat (centre + butées réels par axe) est sauvé dans `dji/rc_calib.json`
+et réappliqué à chaque lancement : le **centre est ramené à 0**, la **pleine
+course à ±32767**, avec une **zone morte** au centre (option `--deadzone`, défaut
+0,03). La RC utilisée ici sort déjà en ±32767 / centre 0 ; la calibration corrige
+surtout la petite dérive du centre et les butées réelles de chaque axe.
+
+---
+
+## 6. Prérequis simulateur
 
 - Les modes `GUIDED` et `LOITER` ont besoin d'une **position estimée** (GPS +
   EKF). En SITL c'est fourni, mais il faut **attendre ~30 s** après le démarrage
@@ -85,7 +109,7 @@ comme une DJI.
 
 ---
 
-## 6. Réglages (paramètres ROS2)
+## 7. Réglages (paramètres ROS2)
 
 Modifiables à chaud, ex. :
 
@@ -105,7 +129,7 @@ docker compose exec sim bash -lc "ros2 param set /flight_control fly_mode ALT_HO
 
 ---
 
-## 7. Réglage / dépannage du geste
+## 8. Réglage / dépannage du geste
 
 Le geste est **robuste au signe** (peu importe quel côté est « positif » sur ta
 radio) : il exige seulement les deux verticaux en butée basse **et** les deux
@@ -127,7 +151,7 @@ python dji/dji_host.py --live
 
 ---
 
-## 8. Comparaison avec le repo PX4 de référence
+## 9. Comparaison avec le repo PX4 de référence
 
 Ce pilotage s'inspire de
 [MechaMind-Labs/ROS2-PX4_Drone_Teleoperation_Using_Joystick](https://github.com/MechaMind-Labs/ROS2-PX4_Drone_Teleoperation_Using_Joystick),
