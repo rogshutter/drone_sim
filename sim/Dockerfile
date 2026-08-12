@@ -113,9 +113,25 @@ RUN cd /root/ros2_ws \
     && rosdep install --from-paths src --ignore-src -y \
     && rm -rf /var/lib/apt/lists/*
 
+# ---------------------------------------------------------------------------
+# microxrceddsgen : générateur requis par ardupilot_sitl (support DDS/ROS2).
+# Sans lui, `colcon build ardupilot_sitl` échoue : "Could not find the program
+# ['microxrceddsgen']". On le construit depuis ArduPilot/Micro-XRCE-DDS-Gen
+# (Java + Gradle) et on l'expose sur le PATH.
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends default-jre-headless \
+    && rm -rf /var/lib/apt/lists/* \
+    && git clone --recurse-submodules --depth 1 \
+       https://github.com/ArduPilot/Micro-XRCE-DDS-Gen.git /root/Micro-XRCE-DDS-Gen \
+    && cd /root/Micro-XRCE-DDS-Gen \
+    && ./gradlew assemble \
+    && ln -sf /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen /usr/local/bin/microxrceddsgen \
+    && microxrceddsgen -version || true
+
 # 1) le stack ardupilot_gz (SITL+Gazebo+RViz)
 RUN cd /root/ros2_ws \
     && . /opt/ros/jazzy/setup.sh \
+    && export PATH="$PATH:/root/Micro-XRCE-DDS-Gen/scripts" \
     && colcon build --packages-up-to ardupilot_gz_bringup --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # 2) nos nodes pédagogiques
