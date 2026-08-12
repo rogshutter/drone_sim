@@ -64,7 +64,7 @@ jobs:
             ${{ steps.img.outputs.name }}:latest
             ${{ steps.img.outputs.name }}:${{ github.sha }}
           build-args: |
-            ARDUPILOT_VERSION=Copter-4.5.7
+            ARDUPILOT_VERSION=master
 
       - name: Résumé
         run: |

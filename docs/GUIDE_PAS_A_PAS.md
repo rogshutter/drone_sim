@@ -116,12 +116,12 @@ scripts\start.bat
 
 Ce que ça fait (et ce qui se passe dans les coulisses) :
 1. Vérifie/attend Docker Desktop.
-2. `docker compose up -d --build` → **construit les 2 images** :
-   - `sim` : installe Gazebo Classic 11, compile le plugin `ardupilot_gazebo`, puis
-     **compile le firmware ArduPilot SITL** (version figée `Copter-4.5.7`). C'est le
-     plus long (10-20 min).
-   - `ros` : installe ROS2 Humble + MAVROS, compile les nodes.
-3. Démarre les 2 conteneurs.
+2. `docker compose up -d --build` → **construit l'image `sim`** : ROS2 Jazzy +
+   Gazebo Harmonic + MAVROS, le plugin `ardupilot_gazebo`, puis **compile le
+   firmware ArduPilot SITL** (branche `master`, réglable par `ARDUPILOT_VERSION`).
+   C'est le plus long (30-60 min). Avec l'image pré-construite de ghcr.io, cette
+   étape se réduit à un téléchargement.
+3. Démarre le conteneur.
 
 **Point de contrôle** : le build se termine sans erreur et les conteneurs tournent.
 Pour vérifier :

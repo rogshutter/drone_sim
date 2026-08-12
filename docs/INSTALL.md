@@ -127,5 +127,7 @@ scripts\stop.bat
   et que `docker compose ps` montre `drone-sim` en `Up`.
 - **`dji_host.py` ne trouve pas la RC** : câble USB-C capable de transfert de données,
   port du dessous, RC allumée, DJI Assistant 2 **fermé**.
-- **Changer la version d'ArduPilot** : modifier `ARDUPILOT_VERSION` dans `.env`,
-  puis `docker compose build sim`.
+- **Changer la version d'ArduPilot** : modifier `ARDUPILOT_VERSION` dans `.env`
+  (branche ou tag), puis `docker compose build sim`. La valeur par défaut est
+  `master`, la référence suivie par `ardupilot_gz` ; un tag ancien n'est garanti
+  ni compatible avec ce stack ni compilable avec le GCC 13 d'Ubuntu 24.04.

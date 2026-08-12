@@ -32,7 +32,7 @@ clone_retry ardupilot_gz         https://github.com/ArduPilot/ardupilot_gz.git j
 clone_retry micro-ROS-Agent      https://github.com/micro-ROS/micro-ROS-Agent.git jazzy 600
 clone_retry ros_gz               https://github.com/gazebosim/ros_gz.git jazzy 300
 clone_retry sdformat_urdf        https://github.com/ros/sdformat_urdf.git jazzy 300
-clone_retry ardupilot            https://github.com/ArduPilot/ardupilot.git master 1500
+clone_retry ardupilot            https://github.com/ArduPilot/ardupilot.git "${ARDUPILOT_VERSION:-master}" 1500
 
 # sous-modules ArduPilot (nécessaires au build SITL), shallow aussi
 cd /root/ros2_ws/src/ardupilot

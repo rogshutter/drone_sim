@@ -13,7 +13,7 @@ services:
       context: .          # racine du projet : le Dockerfile référence sim/ et ros/
       dockerfile: sim/Dockerfile
       args:
-        ARDUPILOT_VERSION: ${ARDUPILOT_VERSION:-Copter-4.5.7}
+        ARDUPILOT_VERSION: ${ARDUPILOT_VERSION:-master}
         ROS2_APT_MIRROR: ${ROS2_APT_MIRROR:-http://packages.ros.org/ros2/ubuntu}
     container_name: drone-sim
     ports:

@@ -72,7 +72,9 @@ Le TP complet (aligné sur les chapitres 2.7 / 2.12 du cours) est dans `docs/TP_
 ## Versions figées
 
 - Ubuntu **24.04**, ROS2 **Jazzy**, Gazebo **Harmonic**, plugin **ardupilot_gz**
-- ArduPilot **Copter-4.5.7** (modifiable dans `.env`)
+- ArduPilot : branche **master**, la référence suivie par `ardupilot_gz`
+  (modifiable via `ARDUPILOT_VERSION` dans `.env`). Ce qui est réellement figé
+  pour les étudiants, c'est l'**image publiée sur ghcr.io**, étiquetée par commit.
 - Miroir apt ROS2 configurable via `ROS2_APT_MIRROR` dans `.env` (si
   `packages.ros.org` est bloqué — réseaux RDC — utiliser ex. Huawei Cloud)
 - Modèles : **iris** (défaut) et **x500** (Holybro X500, meshes officiels PX4).

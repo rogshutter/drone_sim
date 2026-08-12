@@ -87,8 +87,15 @@ RUN git config --global http.lowSpeedLimit 1000 \
     && git config --global http.version HTTP/1.1 \
     && git config --global http.postBuffer 524288000
 
+# Référence ArduPilot compilée dans le workspace (le paquet ardupilot_sitl).
+# Par défaut master, comme le ros2_gz.repos d'ardupilot_gz : c'est la seule
+# combinaison testée en amont, et un tag ancien n'est garanti ni compatible avec
+# ardupilot_gz ni compilable avec le GCC 13 d'Ubuntu 24.04. La reproductibilité
+# vient d'ailleurs : l'image publiée sur ghcr.io est figée, étiquetée par commit.
+ARG ARDUPILOT_VERSION=master
+
 # clones SHALLOW (--depth 1) : beaucoup moins de volume à télécharger sur réseau instable
-RUN /root/clone_repos.sh
+RUN ARDUPILOT_VERSION="${ARDUPILOT_VERSION}" /root/clone_repos.sh
 
 # ---------------------------------------------------------------------------
 # Modèle visuel x500 (Holybro) depuis PX4/PX4-gazebo-models (licence BSD-3).
@@ -118,17 +125,42 @@ RUN cd /root/ros2_ws \
 # Sans lui, `colcon build ardupilot_sitl` échoue : "Could not find the program
 # ['microxrceddsgen']". On le construit depuis ArduPilot/Micro-XRCE-DDS-Gen
 # (Java + Gradle) et on l'expose sur le PATH.
+#
+# JDK 17 explicitement : le wrapper du dépôt impose Gradle 7.6, qui ne sait pas
+# lire le bytecode de Java 21 — le JDK par défaut d'Ubuntu 24.04 (l'erreur est
+# "Unsupported class file major version 65"). Et un JDK, pas un JRE :
+# `gradlew assemble` compile des sources Java.
+#
+# Aucun `|| true` ici : un échec doit arrêter le build à cet endroit, sinon il
+# ressurgit trois minutes plus tard en erreur waf incompréhensible.
 # ---------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends default-jre-headless \
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/* \
     && git clone --recurse-submodules --depth 1 \
        https://github.com/ArduPilot/Micro-XRCE-DDS-Gen.git /root/Micro-XRCE-DDS-Gen \
     && cd /root/Micro-XRCE-DDS-Gen \
     && ./gradlew assemble \
     && ln -sf /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen /usr/local/bin/microxrceddsgen \
-    && microxrceddsgen -version || true
+    && test -f share/microxrceddsgen/java/microxrceddsgen.jar
+
+# ---------------------------------------------------------------------------
+# Outils Python du build ArduPilot (waf) et de MAVLink
+# ---------------------------------------------------------------------------
+# empy, pexpect et future viennent d'apt : pip installerait empy 4.x, que waf
+# refuse. MAVProxy et pymavlink, absents d'apt, viennent de pip — Ubuntu 24.04
+# déclare son Python "externally managed" (PEP 668), d'où --break-system-packages.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-empy python3-pexpect python3-future \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip3 install --break-system-packages --no-cache-dir MAVProxy pymavlink
+
+# waf et les outils autotest d'ArduPilot appellent `python`
+RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 # 1) le stack ardupilot_gz (SITL+Gazebo+RViz)
+# C'est ici que le firmware SITL est compilé : le paquet ardupilot_sitl lance waf
+# et installe `arducopter` dans install/ardupilot_sitl/bin. Inutile donc de
+# compiler ArduPilot une seconde fois hors du workspace.
 RUN cd /root/ros2_ws \
     && . /opt/ros/jazzy/setup.sh \
     && export PATH="$PATH:/root/Micro-XRCE-DDS-Gen/scripts" \
@@ -138,21 +170,6 @@ RUN cd /root/ros2_ws \
 RUN cd /root/ros2_ws \
     && . /opt/ros/jazzy/setup.sh \
     && colcon build --packages-select joy_bridge flight_control pid_tuner obstacle_avoid drone_launch --symlink-install
-
-# ---------------------------------------------------------------------------
-# ArduPilot SITL (version figée, principe du corpus)
-# ---------------------------------------------------------------------------
-ARG ARDUPILOT_VERSION=Copter-4.5.7
-RUN git clone --depth 1 --branch ${ARDUPILOT_VERSION} https://github.com/ArduPilot/ardupilot.git /ardupilot \
-    && cd /ardupilot \
-    && git submodule update --init --recursive --depth 1
-
-RUN ln -sf /usr/bin/python3 /usr/bin/python || true
-RUN pip3 install MAVProxy pymavlink pexpect future empy
-
-RUN cd /ardupilot \
-    && ./waf configure --board sitl \
-    && ./waf copter
 
 # ---------------------------------------------------------------------------
 # Lancement
