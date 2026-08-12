@@ -1,0 +1,11 @@
+# Paramètres SITL pour le x500 (quad-X) — chargés au démarrage d'ArduPilot.
+# La physique vient de Gazebo (via ArduPilotPlugin) ; ici on fixe surtout la
+# géométrie de châssis et la plage PWM des moteurs.
+
+# Quad en X
+FRAME_CLASS      1
+FRAME_TYPE       1
+
+# Plage PWM des moteurs (doit correspondre à servo_min/servo_max du modèle SDF)
+MOT_PWM_MIN      1100
+MOT_PWM_MAX      1900

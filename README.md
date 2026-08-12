@@ -38,6 +38,7 @@ QGroundControl (host) ◀──MAVLink──▶ SITL                       + RVi
 - `scripts/` — lanceurs 1-clic (`start.bat` / `start.sh`, `stop`, `run_dji`)
 - `docs/` — toute la documentation :
   - `GUIDE_PAS_A_PAS.md` — **le guide de démarrage complet (étape par étape, pour l'encadrant)**
+  - `PILOTAGE_DJI.md` — **pilotage façon DJI : décollage et arrêt par geste « V »**
   - `GUIDE_DEBUTANT.md` — le système expliqué de zéro (débutant)
   - `ECRIRE_SES_SCRIPTS.md` — écrire ses propres scripts ROS2 (évitement d'obstacles)
   - `GUIDE_SIMULATEURS.md` — les simulateurs/outils pour les prochains chapitres
@@ -74,7 +75,15 @@ Le TP complet (aligné sur les chapitres 2.7 / 2.12 du cours) est dans `docs/TP_
 - ArduPilot **Copter-4.5.7** (modifiable dans `.env`)
 - Miroir apt ROS2 configurable via `ROS2_APT_MIRROR` dans `.env` (si
   `packages.ros.org` est bloqué — réseaux RDC — utiliser ex. Huawei Cloud)
-- Modèles : **iris** (défaut) et **X500** (`sim/models/x500`, 500 mm / ~2 kg)
+- Modèles : **iris** (défaut) et **x500** (Holybro X500, meshes officiels PX4).
+  Choix du drone via la variable `FRAME` :
+  ```bash
+  FRAME=x500 scripts/start.sh      # Linux
+  set FRAME=x500 && scripts\start.bat   # Windows
+  ```
+  Le x500 réutilise le modèle officiel `x500_base` (récupéré au build depuis
+  PX4/PX4-gazebo-models, BSD-3) piloté par le plugin ArduPilot. Voir
+  `docs/PILOTAGE_DJI.md` §9.
 
 > Principe du cours : *on règle en simulation avant le matériel — un mauvais gain
 > en simulation coûte une minute, sur un appareil réel il casse du matériel.*

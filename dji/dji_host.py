@@ -11,12 +11,18 @@ Utilisation :
     python dji_host.py COM7                  # forcer le port série
     python dji_host.py --target 192.168.1.50 # changer la destination UDP
     python dji_host.py --live                # afficher les valeurs sans envoyer
+    python dji_host.py --calibrate           # calibrer la RC (centre + butées) puis piloter
+
+Calibration : mesure le centre réel et les butées de chaque axe, avec une zone
+morte au centre (option --deadzone). Résultat sauvé dans dji/rc_calib.json et
+réappliqué automatiquement aux lancements suivants.
 
 Dépendance : pyserial (`pip install -r requirements.txt`).
 """
 
 import argparse
 import json
+import os
 import socket
 import struct
 import sys
@@ -30,12 +36,98 @@ DJI_VID = 0x2CA3
 
 # Axes (offsets reverse-engineered dans dji.py, communs à Windows et Linux)
 FIELDS = {'rx': (13, 15), 'ry': (16, 18), 'ly': (19, 21), 'lx': (22, 24), 'cam': (25, 27)}
+AXES = ['lx', 'ly', 'rx', 'ry', 'cam']
+
+MAX_OUT = 32767   # plage de sortie envoyée en UDP : ±32767 (centre 0)
+
+# Fichier de calibration, à côté du script (dji/rc_calib.json).
+CALIB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rc_calib.json')
 
 
 def parse_input(byte):
     """Convertit une valeur DJI (centre 1024, min 364, max 1684) en plage ±32767."""
     raw = int.from_bytes(byte, byteorder='little')
     return int((raw - 1024) * 65535 / (1684 - 364))
+
+
+# ---------------------------------------------------------------------------
+# Calibration RC : centre réel + butées réelles + zone morte, par axe.
+# La calibration s'applique sur les valeurs déjà mises à l'échelle (±32767).
+# But : centre parfaitement neutre (pas de dérive) et pleine amplitude propre.
+# ---------------------------------------------------------------------------
+def load_calib(path=CALIB_PATH):
+    """Charge la calibration si le fichier existe, sinon None."""
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def save_calib(calib, path=CALIB_PATH):
+    with open(path, 'w') as f:
+        json.dump(calib, f, indent=2)
+
+
+def norm_axis(v, cal, deadzone):
+    """Ramène v (±32767 brut) en ±32767 calibré : centre -> 0, butée -> ±32767,
+    avec une zone morte (fraction de la course, ex. 0.03) autour du centre."""
+    c = cal.get('center', 0)
+    lo = cal.get('min', -MAX_OUT)
+    hi = cal.get('max', MAX_OUT)
+    span = max(hi - c, 1) if v >= c else max(c - lo, 1)
+    out = (v - c) / span                       # -1 .. +1
+    if abs(out) < deadzone:
+        return 0
+    sign = 1.0 if out > 0 else -1.0
+    out = sign * (abs(out) - deadzone) / (1.0 - deadzone)   # remise à l'échelle
+    return int(max(-1.0, min(1.0, out)) * MAX_OUT)
+
+
+def apply_calib(state, calib, deadzone):
+    """Applique la calibration à tout l'état {lx,ly,rx,ry,cam}."""
+    if not calib:
+        # Pas de calibration : centre 0, ±32767, mais on garde la zone morte.
+        return {k: norm_axis(v, {}, deadzone) for k, v in state.items()}
+    return {k: norm_axis(v, calib.get(k, {}), deadzone) for k, v in state.items()}
+
+
+def _collect(ser, seconds):
+    """Lit des états pendant `seconds` et renvoie la liste des dicts lus."""
+    out = []
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        out.append(read_state(ser))
+    return out
+
+
+def run_calibration(ser, path=CALIB_PATH):
+    """Calibration interactive : mesure le centre puis les butées de chaque axe."""
+    print('\n=== Calibration de la RC ===')
+    print('Étape 1/2 : LÂCHE tous les sticks (position centre) et NE TOUCHE PAS.')
+    input('  Appuie sur Entrée quand les sticks sont au centre... ')
+    print('  Mesure du centre (2 s)...')
+    center_samples = _collect(ser, 2.0)
+    center = {a: int(sorted(s[a] for s in center_samples)[len(center_samples) // 2])
+              for a in AXES}   # médiane = robuste au bruit
+
+    print('\nÉtape 2/2 : BOUGE tous les sticks ET la molette dans TOUTES les')
+    print('directions, jusqu\'aux butées, pendant 6 s.')
+    input('  Appuie sur Entrée puis bouge tout... ')
+    print('  Enregistrement des butées (6 s)... BOUGE !')
+    ext = _collect(ser, 6.0)
+    calib = {}
+    for a in AXES:
+        vals = [s[a] for s in ext] + [center[a]]
+        calib[a] = {'min': int(min(vals)), 'center': center[a], 'max': int(max(vals))}
+
+    save_calib(calib, path)
+    print(f'\nCalibration enregistrée dans {path} :')
+    for a in AXES:
+        c = calib[a]
+        print(f"  {a:3s}: min={c['min']:+6d}  centre={c['center']:+6d}  max={c['max']:+6d}")
+    print('=== Calibration terminée ===\n')
+    return calib
 
 
 def get_dji_vid(port):
@@ -139,10 +231,25 @@ def main():
     ap.add_argument('--target', default='127.0.0.1', help='IP de destination UDP (défaut 127.0.0.1)')
     ap.add_argument('--udp-port', type=int, default=7777, help='Port UDP (défaut 7777)')
     ap.add_argument('--live', action='store_true', help='Afficher les valeurs sans envoyer')
+    ap.add_argument('--calibrate', action='store_true',
+                    help='Lancer la calibration de la RC puis piloter')
+    ap.add_argument('--no-calib', action='store_true',
+                    help='Ignorer le fichier de calibration')
+    ap.add_argument('--deadzone', type=float, default=0.03,
+                    help='Zone morte au centre (fraction de la course, défaut 0.03)')
     args = ap.parse_args()
 
     dev = find_port(args.port)
     ser = serial.Serial(port=dev, timeout=1.0)
+
+    # Calibration : demandée explicitement, ou proposée au premier usage.
+    calib = None if args.no_calib else load_calib()
+    if args.calibrate:
+        calib = run_calibration(ser)
+    elif calib is None and not args.no_calib:
+        print('Aucune calibration trouvée. Lance « python dji_host.py --calibrate »')
+        print('pour un centre parfaitement neutre. (Valeurs par défaut utilisées.)\n')
+
     print('Lecture des sticks. Ctrl+C pour arrêter.\n')
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -151,7 +258,7 @@ def main():
     last = None
     try:
         while True:
-            st = read_state(ser)
+            st = apply_calib(read_state(ser), calib, args.deadzone)
             if args.live:
                 line = f"LX={st['lx']:+6d} LY={st['ly']:+6d} RX={st['rx']:+6d} RY={st['ry']:+6d} CAM={st['cam']:+6d}"
                 if line != last:

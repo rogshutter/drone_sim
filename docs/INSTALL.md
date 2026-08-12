@@ -55,6 +55,17 @@ Vous devez voir **`drone-sim`** en statut `Up` (un seul conteneur : SITL + Gazeb
    scripts\run_dji.bat
    ```
    → le script détecte le port, envoie les sticks au conteneur ROS2 (UDP 7777).
+   Au **premier lancement**, il lance d'abord la **calibration** de la RC :
+   suivre les 2 étapes (centre, puis bouger tous les sticks + la molette). La
+   calibration est mémorisée (`dji/rc_calib.json`) ; pour la refaire :
+   `python dji\dji_host.py --calibrate`.
+4. **Décoller façon DJI** : fais le **geste « V »** (les deux sticks vers le bas
+   et l'un vers l'autre, maintenu ~1,2 s). Le drone arme, décolle et tient sa
+   position. Refais le même geste **en vol** pour **atterrir**. Détails et
+   réglages : [`PILOTAGE_DJI.md`](PILOTAGE_DJI.md).
+
+   > Attends ~30 s après le démarrage que le GPS/EKF du SITL soit prêt, sinon
+   > l'armement est refusé.
 
 ## 5. Voir le vol et régler le PID (QGroundControl)
 

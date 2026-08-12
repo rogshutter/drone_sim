@@ -90,6 +90,19 @@ RUN git config --global http.lowSpeedLimit 1000 \
 # clones SHALLOW (--depth 1) : beaucoup moins de volume à télécharger sur réseau instable
 RUN /root/clone_repos.sh
 
+# ---------------------------------------------------------------------------
+# Modèle visuel x500 (Holybro) depuis PX4/PX4-gazebo-models (licence BSD-3).
+# Sert au frame optionnel FRAME=x500. Récupéré en sparse (x500 + x500_base) et
+# posé sur /opt/gz_models/models, ajouté à GZ_SIM_RESOURCE_PATH au runtime.
+# ---------------------------------------------------------------------------
+RUN mkdir -p /opt/gz_models/models \
+    && git clone --depth 1 --filter=blob:none --sparse \
+       https://github.com/PX4/PX4-gazebo-models.git /tmp/px4models \
+    && git -C /tmp/px4models sparse-checkout set models/x500 models/x500_base \
+    && cp -r /tmp/px4models/models/x500 /tmp/px4models/models/x500_base /opt/gz_models/models/ \
+    && rm -rf /tmp/px4models \
+    || echo "AVERTISSEMENT: modèle x500 non récupéré (frame x500 indisponible, iris reste OK)."
+
 # nos nodes pédagogiques (joy_bridge, flight_control, pid_tuner, obstacle_avoid, drone_launch)
 COPY ros/src /root/ros2_ws/src/
 

@@ -6,8 +6,8 @@ set -e
 
 ln -sf /usr/bin/python3 /usr/bin/python || true
 
-# ressources Gazebo personnalisees (modeles X500, mondes) montees depuis le projet
-export GZ_SIM_RESOURCE_PATH="${GZ_SIM_RESOURCE_PATH:-/sim/models:/sim/worlds}"
+# ressources Gazebo : modeles/mondes du projet (montes) + meshes x500 (image).
+export GZ_SIM_RESOURCE_PATH="${GZ_SIM_RESOURCE_PATH:-/sim/models:/sim/worlds}:/opt/gz_models/models"
 
 source /opt/ros/jazzy/setup.bash
 source /root/ros2_ws/install/setup.bash
