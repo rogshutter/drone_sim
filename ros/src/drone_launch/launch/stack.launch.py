@@ -20,16 +20,31 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     has_display = bool(os.environ.get('DISPLAY'))
 
-    # SITL + Gazebo Harmonic (ardupilot_gz_bringup), RViz si écran
-    gz = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            get_package_share_directory('ardupilot_gz_bringup')
-            + '/launch/iris_runway.launch.py'
-        ),
-        launch_arguments={
-            'rviz': 'true' if has_display else 'false',
-        }.items(),
-    )
+    # Choix du drone : FRAME=x500 -> notre x500 ArduPilot ; sinon iris (défaut).
+    frame = os.environ.get('FRAME', 'iris').lower()
+
+    if frame == 'x500':
+        # SITL + Gazebo avec le modèle x500 (meshes officiels Holybro).
+        gz = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                get_package_share_directory('drone_launch')
+                + '/launch/x500_sim.launch.py'
+            ),
+            launch_arguments={
+                'rviz': 'true' if has_display else 'false',
+            }.items(),
+        )
+    else:
+        # SITL + Gazebo Harmonic (ardupilot_gz_bringup, iris), RViz si écran.
+        gz = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                get_package_share_directory('ardupilot_gz_bringup')
+                + '/launch/iris_runway.launch.py'
+            ),
+            launch_arguments={
+                'rviz': 'true' if has_display else 'false',
+            }.items(),
+        )
 
     return LaunchDescription([
         gz,

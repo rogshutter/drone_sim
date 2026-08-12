@@ -163,7 +163,29 @@ adapté à **ArduPilot** :
 | Décollage | Bouton A (arm) | **Geste « V »** façon DJI |
 | Arrêt | Bouton Y (disarm) | **Geste « V »** en vol → `LAND` |
 | Tenue de position | OFFBOARD | **`LOITER`** (tenue GPS, lâcher = stationnaire) |
+| Drone | x500 (PX4) | **x500** (mêmes meshes Holybro) ou iris |
 
-> Le modèle **x500** de la référence vient de PX4. Pour l'avoir en ArduPilot,
-> il faut le modèle x500 de `ardupilot_gazebo` (changement de monde/modèle) —
-> voir la note dans le README.
+### Choisir le drone (iris ou x500)
+
+Le **x500** de la référence est un modèle PX4. On le réutilise ici sous
+ArduPilot : le modèle officiel `x500_base` (meshes Holybro, capteurs) est
+récupéré au build depuis [PX4/PX4-gazebo-models](https://github.com/PX4/PX4-gazebo-models)
+(licence BSD-3) et piloté par le **plugin ArduPilot** (au lieu du plugin PX4).
+
+Sélection par la variable d'environnement `FRAME` (défaut `iris`) :
+
+```bash
+# Linux
+FRAME=x500 scripts/start.sh
+# Windows
+set FRAME=x500
+scripts\start.bat
+```
+
+- `FRAME=iris` (défaut) : lancement iris officiel `ardupilot_gz` (inchangé).
+- `FRAME=x500` : notre modèle x500 (`sim/models/x500`), monde
+  `sim/worlds/x500_runway.world`, params SITL `sim/config/gazebo-x500.parm`.
+
+Le geste « V », la calibration et le mapping des sticks sont **identiques** quel
+que soit le drone. Pour revenir à l'iris en cas de souci : enlève `FRAME` (ou
+`FRAME=iris`) et relance.

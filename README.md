@@ -75,10 +75,15 @@ Le TP complet (aligné sur les chapitres 2.7 / 2.12 du cours) est dans `docs/TP_
 - ArduPilot **Copter-4.5.7** (modifiable dans `.env`)
 - Miroir apt ROS2 configurable via `ROS2_APT_MIRROR` dans `.env` (si
   `packages.ros.org` est bloqué — réseaux RDC — utiliser ex. Huawei Cloud)
-- Modèles : **iris** (défaut, utilisé par la sim). Un modèle **X500**
-  (`sim/models/x500`) est présent mais c'est actuellement un iris renommé
-  (meshes iris) ; un vrai x500 (via `ardupilot_gazebo`) reste à câbler — voir
-  `docs/PILOTAGE_DJI.md` §8.
+- Modèles : **iris** (défaut) et **x500** (Holybro X500, meshes officiels PX4).
+  Choix du drone via la variable `FRAME` :
+  ```bash
+  FRAME=x500 scripts/start.sh      # Linux
+  set FRAME=x500 && scripts\start.bat   # Windows
+  ```
+  Le x500 réutilise le modèle officiel `x500_base` (récupéré au build depuis
+  PX4/PX4-gazebo-models, BSD-3) piloté par le plugin ArduPilot. Voir
+  `docs/PILOTAGE_DJI.md` §9.
 
 > Principe du cours : *on règle en simulation avant le matériel — un mauvais gain
 > en simulation coûte une minute, sur un appareil réel il casse du matériel.*
