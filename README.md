@@ -8,6 +8,13 @@ le comportement **en 3D** (Gazebo Harmonic / RViz) et dans **QGroundControl**.
 Stack moderne et durable : **Ubuntu 24.04 + ROS2 Jazzy + Gazebo Harmonic +
 ardupilot_gz** (le plugin officiel ArduPilot).
 
+**Installation en une commande** (`scripts/start.bat` sous Windows, `scripts/start.sh`
+sous Linux) :
+- **Image pré-construite** téléchargée depuis ghcr.io (pas de compilation) ; build
+  local automatique en repli si l'image n'est pas disponible.
+- **GPU ou CPU détecté automatiquement** : accélération 3D sur Linux + GPU NVIDIA,
+  rendu CPU (software) partout ailleurs, Windows inclus. Rien à configurer.
+
 ```
 RC-N1 ──USB──▶ dji_host.py (host) ──UDP 7777──▶ joy_bridge ──/joy──▶ flight_control
                                                                        │

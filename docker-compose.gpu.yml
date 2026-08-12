@@ -1,0 +1,29 @@
+# Override GPU — Linux + carte NVIDIA uniquement.
+#
+# Active l'accélération matérielle de la vue 3D (Gazebo / RViz) via le
+# nvidia-container-toolkit. Ajouté AUTOMATIQUEMENT par scripts/start.sh quand
+# une carte NVIDIA + le runtime Docker nvidia sont détectés. Sinon, on reste en
+# rendu CPU (software / llvmpipe), défini dans docker-compose.yml.
+#
+# Prérequis côté hôte (Linux) :
+#   - pilote NVIDIA installé (`nvidia-smi` fonctionne)
+#   - nvidia-container-toolkit installé et configuré pour Docker
+#     (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/)
+#
+# NOTE : sous Windows / Docker Desktop, ce fichier n'est PAS utilisé — le
+# passthrough OpenGL de Gazebo n'y est pas disponible, le rendu reste en CPU.
+services:
+  sim:
+    environment:
+      # Rendu matériel : on désactive le forçage software du mode CPU.
+      - LIBGL_ALWAYS_SOFTWARE=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      # 'all' inclut graphics/display/compute : nécessaire au rendu OpenGL de Gazebo.
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

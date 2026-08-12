@@ -1,0 +1,73 @@
+name: Build & push sim image
+
+# Construit l'image du simulateur (sim/Dockerfile) sur les runners GitHub —
+# réseau rapide, donc les dépôts GitHub lents côté étudiant ne sont plus un
+# problème — puis la publie sur ghcr.io. Les étudiants n'ont plus qu'à faire
+# `docker compose pull` (via scripts/start.sh|bat) au lieu de compiler.
+#
+# Déclenchement :
+#   - push sur main touchant le conteneur (sim/**, ros/**) ou ce workflow
+#   - manuellement (onglet Actions -> Run workflow), sur n'importe quelle branche
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'sim/**'
+      - 'ros/**'
+      - '.github/workflows/build-image.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write        # nécessaire pour pousser sur ghcr.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Le build (ROS2 + Gazebo + ArduPilot SITL) est volumineux : on libère de
+      # la place sur le runner pour éviter un "no space left on device".
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af || true
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Nom d'image en minuscules (exigé par ghcr.io), dérivé du dépôt.
+      - name: Compute image name
+        id: img
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: sim/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.img.outputs.name }}:latest
+            ${{ steps.img.outputs.name }}:${{ github.sha }}
+          build-args: |
+            ARDUPILOT_VERSION=Copter-4.5.7
+
+      - name: Résumé
+        run: |
+          echo "Image publiée : ${{ steps.img.outputs.name }}:latest" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "⚠️ Rendez le package **public** (Packages -> drone_sim -> Package settings -> Change visibility) pour que les étudiants puissent le tirer sans authentification." >> "$GITHUB_STEP_SUMMARY"

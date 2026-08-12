@@ -5,4 +5,6 @@ cd "$(dirname "$0")/.."
 
 export DISPLAY="${DISPLAY:-:0}"
 echo "Lancement de la vue 3D Gazebo (gzclient) sur DISPLAY=$DISPLAY ..."
-docker compose exec -e DISPLAY="$DISPLAY" -e LIBGL_ALWAYS_SOFTWARE=1 sim gzclient
+# LIBGL_ALWAYS_SOFTWARE n'est PAS forcé ici : gzclient hérite du réglage du
+# conteneur (CPU software par défaut, GPU matériel si start.sh a activé l'overlay).
+docker compose exec -e DISPLAY="$DISPLAY" sim gzclient
