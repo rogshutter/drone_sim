@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """flight_control_node — convertit sensor_msgs/Joy en RC override ArduPilot.
 
-Mapping (standard Mode 2) :
-    RC1  Roll    <- axes[0]  (LX)
-    RC2  Pitch   <- axes[1]  (LY)
-    RC3  Throttle<- axes[3]  (RY)
-    RC4  Yaw     <- axes[2]  (RX)
+Mapping (Mode 2 DJI — stick gauche = gaz/lacet, stick droit = tangage/roulis) :
+    RC1  Roll    <- axes[2]  (RX)  stick droit horizontal
+    RC2  Pitch   <- axes[3]  (RY)  stick droit vertical
+    RC3  Throttle<- axes[1]  (LY)  stick gauche vertical
+    RC4  Yaw     <- axes[0]  (LX)  stick gauche horizontal
     RC5  Mode    <- molette caméra (axes[4]) : fond gauche / fond droit
 
 Chaque valeur est convertie de [-1,1] en [1000,2000] (centre 1500), la plage
@@ -57,10 +57,10 @@ class FlightControl(Node):
         if not self.armed:
             return
         msg = OverrideRCIn()
-        msg.channels[0] = _to_pwm(self.axes[0])  # roll
-        msg.channels[1] = _to_pwm(self.axes[1])  # pitch
-        msg.channels[2] = _to_pwm(self.axes[3])  # throttle
-        msg.channels[3] = _to_pwm(self.axes[2])  # yaw
+        msg.channels[0] = _to_pwm(self.axes[2])  # roll     <- stick droit horizontal (RX)
+        msg.channels[1] = _to_pwm(self.axes[3])  # pitch    <- stick droit vertical (RY)
+        msg.channels[2] = _to_pwm(self.axes[1])  # throttle <- stick gauche vertical (LY)
+        msg.channels[3] = _to_pwm(self.axes[0])  # yaw      <- stick gauche horizontal (LX)
         # molette caméra -> canal 5 (mode de vol), centre = 1500
         cam = self.axes[4]
         if cam > 0.7:
