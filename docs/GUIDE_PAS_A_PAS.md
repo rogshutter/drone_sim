@@ -241,7 +241,7 @@ changeant deux nombres. C'est le chapitre 2.7/2.6 rendu concret.
 
 **Voie ROS2 (pour les curieux)** :
 ```bat
-docker compose exec ros bash -lc "ros2 param set /pid_tuner ATC_RAT_PIT_D 0.0012"
+docker compose exec sim bash -lc "ros2 param set /pid_tuner ATC_RAT_PIT_D 0.0012"
 ```
 
 💡 **Aux étudiants** : « on ne règle pas un PID sur un appareil réel — un mauvais
@@ -256,9 +256,9 @@ Pour aller plus loin (évitement d'obstacles, missions) — voir `docs/ECRIRE_SE
 Test rapide de l'exemple fourni :
 ```bat
 :: dans un terminal
-docker compose exec ros bash -lc "ros2 run obstacle_avoid obstacle_avoid_node"
+docker compose exec sim bash -lc "ros2 run obstacle_avoid obstacle_avoid_node"
 :: puis, dans un 2e terminal, simule un obstacle proche :
-docker compose exec ros bash -lc "ros2 topic pub -r 10 /range/forward sensor_msgs/msg/Range '{range: 1.0}'"
+docker compose exec sim bash -lc "ros2 topic pub -r 10 /range/forward sensor_msgs/msg/Range '{range: 1.0}'"
 ```
 
 **Point de contrôle** : dans les logs du nœud, tu vois « Obstacle à 1.00 m -> recul ».

@@ -131,6 +131,6 @@ RUN cd /ardupilot \
 COPY sim/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 5760 14550/udp 7777/udp 11311 8080
+EXPOSE 5760 14550/udp 7777/udp
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -79,10 +79,10 @@ while True:
 
 ### ROS2 CLI — explorer et lancer
 ```bash
-docker compose exec ros bash -lc "ros2 topic list"       # tout ce qui circule
-docker compose exec ros bash -lc "ros2 topic echo /mavros/local_position/pose"
-docker compose exec ros bash -lc "ros2 service list"     # les actions possibles
-docker compose exec ros bash -lc "ros2 run mon_package mon_noeud_node"
+docker compose exec sim bash -lc "ros2 topic list"       # tout ce qui circule
+docker compose exec sim bash -lc "ros2 topic echo /mavros/local_position/pose"
+docker compose exec sim bash -lc "ros2 service list"     # les actions possibles
+docker compose exec sim bash -lc "ros2 run mon_package mon_noeud_node"
 ```
 
 ### gzclient — LA vue 3D (voir l'oscillation du drone)
@@ -103,7 +103,7 @@ concret.
 
 ### rviz2 — voir les topics en 3D (optionnel, avancé)
 rviz2 a besoin d'un écran. Sur Windows avec **VcXsrv** : lancer VcXsrv, définir
-`DISPLAY=127.0.0.1:0`, puis `docker compose exec ros bash -lc "rviz2"`. Utile pour
+`DISPLAY=127.0.0.1:0`, puis `docker compose exec sim bash -lc "rviz2"`. Utile pour
 visualiser les capteurs, les repères TF, les consignes ROS2.
 
 ---

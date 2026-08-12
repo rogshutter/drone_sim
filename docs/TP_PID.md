@@ -89,13 +89,13 @@ Dans un terminal, pendant que le simulateur tourne :
 
 ```bash
 # voir le paramètre actuel
-docker compose exec ros bash -lc "ros2 param get /pid_tuner ATC_RAT_PIT_P"
+docker compose exec sim bash -lc "ros2 param get /pid_tuner ATC_RAT_PIT_P"
 
 # le modifier — le drone réagit immédiatement
-docker compose exec ros bash -lc "ros2 param set /pid_tuner ATC_RAT_PIT_D 0.0012"
+docker compose exec sim bash -lc "ros2 param set /pid_tuner ATC_RAT_PIT_D 0.0012"
 
 # observer l'attitude en direct
-docker compose exec ros bash -lc "ros2 topic echo /mavros/local_position/pose"
+docker compose exec sim bash -lc "ros2 topic echo /mavros/local_position/pose"
 ```
 
 Reproduisez l'étape C-1 avec la commande ROS2 : divisez `ATC_RAT_PIT_D` par 3,
