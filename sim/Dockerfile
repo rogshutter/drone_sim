@@ -131,8 +131,15 @@ RUN cd /root/ros2_ws \
 # "Unsupported class file major version 65"). Et un JDK, pas un JRE :
 # `gradlew assemble` compile des sources Java.
 #
+# Exposition par un script relais, pas par un lien symbolique : le lanceur amont
+# localise son jar avec `dirname $0` sans résoudre les liens, donc un lien depuis
+# /usr/local/bin le fait chercher /usr/local/share/... et échouer sur
+# "Unable to access jarfile".
+#
 # Aucun `|| true` ici : un échec doit arrêter le build à cet endroit, sinon il
-# ressurgit trois minutes plus tard en erreur waf incompréhensible.
+# ressurgit trois minutes plus tard en erreur waf incompréhensible. L'appel
+# `-version` valide toute la chaîne (java, relais, jar) et non la seule présence
+# du fichier.
 # ---------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/* \
@@ -140,8 +147,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-
        https://github.com/ArduPilot/Micro-XRCE-DDS-Gen.git /root/Micro-XRCE-DDS-Gen \
     && cd /root/Micro-XRCE-DDS-Gen \
     && ./gradlew assemble \
-    && ln -sf /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen /usr/local/bin/microxrceddsgen \
-    && test -f share/microxrceddsgen/java/microxrceddsgen.jar
+    && printf '#!/bin/sh\nexec /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen "$@"\n' \
+       > /usr/local/bin/microxrceddsgen \
+    && chmod +x /usr/local/bin/microxrceddsgen \
+    && microxrceddsgen -version
 
 # ---------------------------------------------------------------------------
 # Outils Python du build ArduPilot (waf) et de MAVLink
@@ -163,7 +172,6 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python
 # compiler ArduPilot une seconde fois hors du workspace.
 RUN cd /root/ros2_ws \
     && . /opt/ros/jazzy/setup.sh \
-    && export PATH="$PATH:/root/Micro-XRCE-DDS-Gen/scripts" \
     && colcon build --packages-up-to ardupilot_gz_bringup --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # 2) nos nodes pédagogiques
