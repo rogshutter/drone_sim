@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>joy_bridge</name>
+  <version>1.0.0</version>
+  <description>Reçoit les valeurs de la RC-N1 (UDP) et les publie en topic sensor_msgs/Joy</description>
+  <maintainer email="vous@exemple.com">drone-sim</maintainer>
+  <license>MIT</license>
+
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

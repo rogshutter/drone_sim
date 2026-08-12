@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>drone_launch</name>
+  <version>1.0.0</version>
+  <description>Lance MAVROS + joy_bridge + flight_control + pid_tuner</description>
+  <maintainer email="vous@exemple.com">drone-sim</maintainer>
+  <license>MIT</license>
+
+
+  <exec_depend>mavros</exec_depend>
+  <exec_depend>joy_bridge</exec_depend>
+  <exec_depend>flight_control</exec_depend>
+  <exec_depend>pid_tuner</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

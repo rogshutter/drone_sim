@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>pid_tuner</name>
+  <version>1.0.0</version>
+  <description>Réglage en direct des gains PID d'ArduPilot (ATC_*) via les paramètres ROS2</description>
+  <maintainer email="vous@exemple.com">drone-sim</maintainer>
+  <license>MIT</license>
+
+
+  <depend>rclpy</depend>
+  <depend>mavros_msgs</depend>
+  <depend>geometry_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

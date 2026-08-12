@@ -1,0 +1,23 @@
+name: drone-sim
+
+services:
+  # --- Simulateur moderne : SITL + Gazebo Harmonic + RViz + MAVROS + nodes ---
+  sim:
+    build:
+      context: .          # racine du projet : le Dockerfile référence sim/ et ros/
+      dockerfile: sim/Dockerfile
+      args:
+        ARDUPILOT_VERSION: ${ARDUPILOT_VERSION:-Copter-4.5.7}
+        ROS2_APT_MIRROR: ${ROS2_APT_MIRROR:-http://packages.ros.org/ros2/ubuntu}
+    container_name: drone-sim
+    ports:
+      - "5760:5760"        # MAVLink TCP (QGroundControl / MAVProxy)
+      - "14550:14550/udp"  # MAVLink UDP (QGroundControl)
+      - "7777:7777/udp"    # sticks RC-N1 (dji_host.py -> joy_bridge)
+    volumes:
+      - ./sim/models:/sim/models:ro
+      - ./sim/worlds:/sim/worlds:ro
+    environment:
+      - DISPLAY=${DISPLAY:-}                 # vue 3D (RViz/Gazebo) via VcXsrv
+      - GZ_SIM_RESOURCE_PATH=/sim/models:/sim/worlds
+    restart: unless-stopped

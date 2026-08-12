@@ -1,0 +1,11 @@
+.git
+.gitignore
+.dockerignore
+.env
+README.md
+docs
+scripts
+dji
+sim/worlds
+sim/models
+sim/params

@@ -1,0 +1,17 @@
+# Override pour Linux natif / WSL2 (Docker Engine, PAS Docker Desktop).
+#
+# Nécessaire pour la vue 3D (RViz / gzclient) : le conteneur doit accéder au
+# serveur X de l'hôte. Deux choses à fournir :
+#   1. le socket X11  (/tmp/.X11-unix) monté dans le conteneur
+#   2. l'authentification X, copiée par scripts/start.sh vers
+#      ${XDOCKER_XAUTH} (défaut ~/.docker-xauth), montée en lecture seule.
+#
+# Utilisé automatiquement par scripts/start.sh et scripts/stop.sh.
+services:
+  sim:
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XDOCKER_XAUTH:-/dev/null}:/tmp/.docker-xauth:ro
+    environment:
+      - DISPLAY=${DISPLAY:-}
+      - XAUTHORITY=/tmp/.docker-xauth

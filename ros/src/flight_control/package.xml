@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>flight_control</name>
+  <version>1.0.0</version>
+  <description>Convertit sensor_msgs/Joy en RC override ArduPilot (MAVROS)</description>
+  <maintainer email="vous@exemple.com">drone-sim</maintainer>
+  <license>MIT</license>
+
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>mavros_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
