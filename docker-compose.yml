@@ -26,7 +26,11 @@ services:
       - ./sim/config:/sim/config:ro   # params SITL (dont gazebo-x500.parm)
     environment:
       - DISPLAY=${DISPLAY:-}                 # vue 3D (RViz/Gazebo) via VcXsrv
-      - GZ_SIM_RESOURCE_PATH=/sim/models:/sim/worlds
+      # Le dossier *share* d'ardupilot_gazebo (pas seulement models/) est
+      # indispensable : les URI `package://ardupilot_gazebo/...` du modele iris
+      # se resolvent depuis ce parent. Sans lui, Gazebo charge un monde vide.
+      - GZ_SIM_RESOURCE_PATH=/sim/models:/sim/worlds:/root/ros2_ws/install/ardupilot_gazebo/share:/opt/gz_models/models
+      - SDF_PATH=/root/ros2_ws/install/ardupilot_gazebo/share
       # Choix du drone : iris (défaut) ou x500. Ex. : FRAME=x500 docker compose up
       - FRAME=${FRAME:-iris}
       # Rendu CPU par défaut (software / llvmpipe) : marche partout, sans GPU.

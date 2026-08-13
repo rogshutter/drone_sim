@@ -12,6 +12,14 @@ export GZ_SIM_RESOURCE_PATH="${GZ_SIM_RESOURCE_PATH:-/sim/models:/sim/worlds}:/o
 source /opt/ros/jazzy/setup.bash
 source /root/ros2_ws/install/setup.bash
 
+# Les URI SDF `package://ardupilot_gazebo/...` se resolvent depuis le dossier
+# *share* du paquet (parent de models/), pas depuis models/ lui-meme. Le hook
+# ament n'ajoute que models/ et worlds/ : sans cette ligne, Gazebo charge un
+# monde vide, le SITL reste sans capteurs JSON, et rien ne vole.
+_apgz_share="$(ros2 pkg prefix ardupilot_gazebo)/share"
+export GZ_SIM_RESOURCE_PATH="${_apgz_share}:${GZ_SIM_RESOURCE_PATH}"
+export SDF_PATH="${_apgz_share}${SDF_PATH:+:$SDF_PATH}"
+
 echo "============================================================"
 echo " Lancement du simulateur (SITL + Gazebo Harmonic + nodes)"
 echo "   - QGroundControl : connexion MAVLink (voir start.bat)"
