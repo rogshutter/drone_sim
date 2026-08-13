@@ -40,12 +40,33 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] Simulation lancée !
+echo [3/3] Simulation lancee !
 echo.
-echo   - QGroundControl : lien UDP, port 14550 (aperçu 3D + réglage PID)
-echo   - MAVROS / ROS2   : demarre automatiquement dans le conteneur sim
-echo   - Manette RC-N1   : lancer dans un autre terminal :
-echo         python "%~dp0..\dji\dji_host.py"
+echo   - Vue 3D         : fenetre Gazebo si un ecran est dispo
+echo   - QGroundControl : TCP  127.0.0.1  port 5760
+echo   - Radio RC-N1    : veille automatique ci-dessous
 echo.
-echo Pour arreter : scripts\stop.bat
+echo Arret du simulateur : scripts\stop.bat
+echo.
+
+REM --- Veille radio (USB sur le PC, pas dans Docker) ---
+where python >nul 2>nul
+if errorlevel 1 (
+    echo Python introuvable : sim allumee, pas de veille radio.
+    echo   Installez Python 3 puis relancez, ou : python dji\dji_host.py
+    endlocal
+    exit /b 0
+)
+python -c "import serial" >nul 2>nul
+if errorlevel 1 (
+    echo pyserial manquant � installation...
+    python -m pip install -q -r dji\requirements.txt
+    if errorlevel 1 (
+        echo Echec pip. Faites : python -m pip install -r dji\requirements.txt
+        echo Le simulateur tourne deja.
+        endlocal
+        exit /b 0
+    )
+)
+python dji\watch_rc.py
 endlocal

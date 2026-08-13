@@ -102,9 +102,27 @@ fi
 
 echo "[3/3] Simulation lancée !"
 echo
-echo "  - QGroundControl : lien UDP, port 14550"
-echo "  - MAVROS / ROS2   : automatique dans le conteneur sim"
-echo "  - Manette RC-N1   : python dji/dji_host.py"
-echo "  - Vue 3D          : scripts/start_gui.sh"
+echo "  - Vue 3D          : fenêtre Gazebo si un écran est dispo"
+echo "  - QGroundControl  : TCP  127.0.0.1  port 5760"
+echo "  - Radio RC-N1     : veille automatique ci-dessous"
 echo
-echo "Pour arrêter : scripts/stop.sh"
+echo "Arrêt du simulateur : scripts/stop.sh"
+echo
+
+# --- 6) Veille radio : un seul start suffit. Python + pyserial sur l'hôte ---
+# (la RC est une prise USB du PC, pas du conteneur).
+PY="$(command -v python3 || command -v python || true)"
+if [ -z "$PY" ]; then
+    echo "Python introuvable : sim allumée, pas de veille radio."
+    echo "  Installez python3 puis relancez, ou : python3 dji/dji_host.py"
+    exit 0
+fi
+if ! "$PY" -c "import serial" 2>/dev/null; then
+    echo "pyserial manquant — j'installe (pip)..."
+    "$PY" -m pip install -q -r dji/requirements.txt || {
+        echo "Échec pip. Faites :  $PY -m pip install -r dji/requirements.txt"
+        echo "Le simulateur tourne déjà."
+        exit 0
+    }
+fi
+exec "$PY" dji/watch_rc.py
