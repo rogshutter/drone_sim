@@ -128,8 +128,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-
        https://github.com/ArduPilot/Micro-XRCE-DDS-Gen.git /root/Micro-XRCE-DDS-Gen \
     && cd /root/Micro-XRCE-DDS-Gen \
     && JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew assemble \
-    && ln -sf /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen /usr/local/bin/microxrceddsgen \
     && test -f /root/Micro-XRCE-DDS-Gen/share/microxrceddsgen/java/microxrceddsgen.jar
+# microxrceddsgen sur le PATH GLOBAL. Pas de symlink dans /usr/local/bin : le
+# script cherche son .jar en relatif (../share), ce qui casse via un symlink.
+# Ainsi toutes les étapes suivantes (colcon ardupilot_sitl, waf /ardupilot)
+# l'appellent correctement.
+ENV PATH="/root/Micro-XRCE-DDS-Gen/scripts:${PATH}"
 
 # ---------------------------------------------------------------------------
 # Prérequis Python d'ArduPilot (waf + génération MAVLink/DroneCAN). REQUIS AVANT
@@ -143,7 +147,6 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python || true \
 # 1) le stack ardupilot_gz (SITL+Gazebo+RViz)
 RUN cd /root/ros2_ws \
     && . /opt/ros/jazzy/setup.sh \
-    && export PATH="$PATH:/root/Micro-XRCE-DDS-Gen/scripts" \
     && colcon build --packages-up-to ardupilot_gz_bringup --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # 2) nos nodes pédagogiques
