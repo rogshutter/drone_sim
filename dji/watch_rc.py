@@ -18,7 +18,7 @@ from dji_host import find_port  # noqa: E402
 HOST_PY = os.path.join(HERE, "dji_host.py")
 CALIB = os.path.join(HERE, "rc_calib.json")
 POLL_S = 2.0
-RETRY_S = 4.0
+RETRY_S = 8.0
 REMINDER_S = 15.0
 
 

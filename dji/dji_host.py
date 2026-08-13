@@ -193,17 +193,15 @@ def probe_port(port, timeout=3.0):
         return None
 
 
+def open_rc(port_name, timeout=0.2):
+    """Ouvre le port en exclusif : évite ModemManager / un 2e script en parallèle."""
+    return serial.Serial(port=port_name, timeout=timeout, exclusive=True)
+
+
 def find_port(forced=None, verbose=True):
     """Trouve le port protocole de la RC. None si absente ou pas encore prête."""
     if forced:
-        try:
-            ser = serial.Serial(port=forced, timeout=2.0)
-            ser.close()
-            return forced
-        except Exception as e:
-            if verbose:
-                print(f'Impossible d\'ouvrir le port {forced} : {e}')
-            return None
+        return forced
 
     protocol, other = [], []
     seen = set()
@@ -227,6 +225,8 @@ def find_port(forced=None, verbose=True):
                 ser.close()
             except Exception:
                 pass
+            # L'USB ACM décroche si on relâche et ré-ouvre trop vite.
+            time.sleep(0.4)
             if verbose:
                 print(f'RC-N1 trouvée sur {port.device}.')
             return port.device
@@ -234,10 +234,20 @@ def find_port(forced=None, verbose=True):
 
 
 def read_state(ser):
-    """Lit un paquet de mesure DJI et renvoie l'état {lx, ly, rx, ry, cam}."""
+    """Lit un paquet de mesure DJI (~20 Hz). Ne pas spammer l'USB : la RC
+    se déconnecte (SerialException « multiple access / no data »)."""
+    ser.timeout = 0.15
+    misses = 0
     while True:
         ser.write(DJI_REQUEST)
         b = ser.read(1)
+        if not b:
+            misses += 1
+            if misses > 25:
+                raise serial.SerialException('RC muette (débranchée ou port déjà pris)')
+            time.sleep(0.04)
+            continue
+        misses = 0
         if b != b'\x55':
             continue
         ph = ser.read(2)
@@ -250,6 +260,7 @@ def read_state(ser):
         data = b'\x55' + ph + ser.read(pl - 3)
         if len(data) != 38:
             continue
+        time.sleep(0.03)  # ~25 Hz, largement assez pour le V
         return {k: parse_input(data[s:e]) for k, (s, e) in FIELDS.items()}
 
 
@@ -271,7 +282,12 @@ def main():
     if not dev:
         print('RC-N1 introuvable. Vérifiez le câble (USB-C du dessous) et l\'allumage.')
         sys.exit(1)
-    ser = serial.Serial(port=dev, timeout=1.0)
+    try:
+        ser = open_rc(dev)
+    except serial.SerialException as e:
+        print(f'Port {dev} occupé ou déconnecté : {e}')
+        print('  Un autre programme tient la radio (souvent ModemManager).')
+        sys.exit(1)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     target = (args.target, args.udp_port)
 
@@ -299,8 +315,14 @@ def main():
                 sock.sendto(msg, target)
     except KeyboardInterrupt:
         print('\nArrêt.')
+    except serial.SerialException as e:
+        print(f'\nRadio coupée : {e}')
+        sys.exit(1)
     finally:
-        ser.close()
+        try:
+            ser.close()
+        except Exception:
+            pass
         sock.close()
 
 
