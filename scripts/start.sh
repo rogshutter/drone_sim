@@ -131,4 +131,8 @@ if ! "$PY" -c "import serial" 2>/dev/null; then
         exit 0
     }
 fi
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet ModemManager 2>/dev/null; then
+    echo "Note : ModemManager tourne. S'il vole la RC, une fois :"
+    echo "  sudo cp dji/99-dji-rc.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules"
+fi
 exec "$PY" dji/watch_rc.py
