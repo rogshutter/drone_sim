@@ -181,7 +181,7 @@ def probe_port(port, timeout=3.0):
             pl = 0b0000001111111111 & struct.unpack('<H', ph)[0]
             if 5 <= pl <= 64:
                 ser.read(pl - 3)
-                ser.timeout = None
+                ser.timeout = 0.2
                 return ser
         ser.close()
         return None
@@ -193,15 +193,15 @@ def probe_port(port, timeout=3.0):
         return None
 
 
-def open_rc(port_name, timeout=0.2):
-    """Ouvre le port en exclusif : évite ModemManager / un 2e script en parallèle."""
-    return serial.Serial(port=port_name, timeout=timeout, exclusive=True)
-
-
-def find_port(forced=None, verbose=True):
-    """Trouve le port protocole de la RC. None si absente ou pas encore prête."""
+def find_open_serial(forced=None, verbose=True):
+    """Ouvre UNE fois le port protocole et le garde. None si pas prêt."""
     if forced:
-        return forced
+        try:
+            return serial.Serial(port=forced, timeout=0.2)
+        except Exception as e:
+            if verbose:
+                print(f'Impossible d\'ouvrir {forced} : {e}')
+            return None
 
     protocol, other = [], []
     seen = set()
@@ -221,16 +221,25 @@ def find_port(forced=None, verbose=True):
             print(f'Test du port {port.device} ({port.description}) ...')
         ser = probe_port(port)
         if ser is not None:
-            try:
-                ser.close()
-            except Exception:
-                pass
-            # L'USB ACM décroche si on relâche et ré-ouvre trop vite.
-            time.sleep(0.4)
             if verbose:
-                print(f'RC-N1 trouvée sur {port.device}.')
-            return port.device
+                print(f'RC-N1 sur {port.device}.')
+            return ser
     return None
+
+
+def find_port(forced=None, verbose=True):
+    """Nom du port seulement (sans l'ouvrir). Pour la veille USB."""
+    if forced:
+        return forced
+    ser = find_open_serial(forced, verbose=verbose)
+    if ser is None:
+        return None
+    name = ser.port
+    try:
+        ser.close()
+    except Exception:
+        pass
+    return name
 
 
 def read_state(ser):
@@ -278,16 +287,12 @@ def main():
                     help='Zone morte au centre (fraction de la course, défaut 0.03)')
     args = ap.parse_args()
 
-    dev = find_port(args.port)
-    if not dev:
-        print('RC-N1 introuvable. Vérifiez le câble (USB-C du dessous) et l\'allumage.')
+    ser = find_open_serial(args.port)
+    if not ser:
+        print('RC-N1 introuvable. Câble USB-C du dessous, RC allumée.')
+        print('  Si ça se répète : sudo cp dji/99-dji-rc.rules /etc/udev/rules.d/')
         sys.exit(1)
-    try:
-        ser = open_rc(dev)
-    except serial.SerialException as e:
-        print(f'Port {dev} occupé ou déconnecté : {e}')
-        print('  Un autre programme tient la radio (souvent ModemManager).')
-        sys.exit(1)
+    print(f'Port {ser.port} ouvert.')
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     target = (args.target, args.udp_port)
 

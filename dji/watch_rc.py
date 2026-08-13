@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
-"""Veille radio : attend que la RC-N1 réponde au protocole, puis lance dji_host.
-
-Ctrl+C arrête la veille, pas le simulateur (scripts/stop.sh / stop.bat).
-"""
+"""Veille radio : dès qu'un USB DJI est là, lance dji_host (lui seul ouvre le port)."""
 
 import os
 import subprocess
 import sys
 import time
 
+import serial.tools.list_ports
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.chdir(HERE)
 
-from dji_host import find_port  # noqa: E402
+from dji_host import DJI_VID, get_dji_vid, is_log_interface, is_protocol_interface  # noqa: E402
 
 HOST_PY = os.path.join(HERE, "dji_host.py")
 CALIB = os.path.join(HERE, "rc_calib.json")
 POLL_S = 2.0
-RETRY_S = 8.0
+RETRY_S = 5.0
 REMINDER_S = 15.0
+
+
+def rc_plugged():
+    """True si un USB DJI (hors canal Log) est listé — sans ouvrir le port."""
+    for port in serial.tools.list_ports.comports(True):
+        if is_log_interface(port):
+            continue
+        if is_protocol_interface(port) or get_dji_vid(port) == DJI_VID:
+            return True
+    return False
 
 
 def main():
@@ -34,10 +43,7 @@ def main():
     waiting = False
     try:
         while True:
-            # On ne lance dji_host QUE si le port protocole répond vraiment
-            # (pas juste « un USB DJI est branché » : il y a aussi un port Log).
-            dev = find_port(verbose=False)
-            if not dev:
+            if not rc_plugged():
                 now = time.time()
                 if not waiting or (now - last_reminder) >= REMINDER_S:
                     print("  En attente de la RC-N1...", flush=True)
@@ -47,12 +53,12 @@ def main():
                 continue
 
             waiting = False
-            cmd = [sys.executable, HOST_PY, dev]
+            cmd = [sys.executable, HOST_PY]
             if not os.path.isfile(CALIB):
-                print(f"RC prête sur {dev} — première fois : calibration, puis pilotage.")
+                print("RC branchée — première fois : calibration, puis pilotage.")
                 cmd.append("--calibrate")
             else:
-                print(f"RC prête sur {dev} — lecture des sticks.")
+                print("RC branchée — lecture des sticks.")
 
             rc = subprocess.call(cmd)
             if rc == 0:
