@@ -32,7 +32,11 @@ import serial
 import serial.tools.list_ports
 
 DJI_REQUEST = bytearray.fromhex('55 0d 04 33 0a 06 eb 34 40 06 01 74 24')
+# Active le mode simulateur RC (sinon les sticks arrivent trop lentement
+# et l'USB se coupe). Même paquet que DjiMini2RCasJoystick.
+DJI_SIM_MODE = bytearray.fromhex('55 0e 04 66 0a 06 eb 34 40 06 24 01 d9 ec')
 DJI_VID = 0x2CA3
+BAUD = 115200
 
 # Axes (offsets reverse-engineered dans dji.py, communs à Windows et Linux)
 FIELDS = {'rx': (13, 15), 'ry': (16, 18), 'ly': (19, 21), 'lx': (22, 24), 'cam': (25, 27)}
@@ -156,48 +160,33 @@ def is_protocol_interface(port):
     ))
 
 
-def probe_port(port, timeout=3.0):
-    """Ouvre un port candidat et vérifie qu'il répond au protocole DJI."""
-    # Attention : port.name est le nom SANS chemin ('ttyACM0'), inutilisable tel
-    # quel par serial.Serial. port.device est le chemin complet ('/dev/ttyACM0').
-    port_name = port.device if port.device else port.name
+def open_rc_serial(port_name):
+    """Ouvre le port comme DjiMini2RCasJoystick (115200 + mode simulateur)."""
+    ser = serial.Serial(
+        port=port_name,
+        baudrate=BAUD,
+        timeout=1.0,
+        write_timeout=1.0,
+        dsrdtr=False,
+        rtscts=False,
+    )
+    time.sleep(0.3)
     try:
-        ser = serial.Serial(port=port_name, timeout=0.2)
-    except Exception:
-        return None
-    try:
-        time.sleep(0.2)
         ser.reset_input_buffer()
-        ser.timeout = timeout
-        ser.write(DJI_REQUEST)
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            b = ser.read(1)
-            if b != b'\x55':
-                continue
-            ph = ser.read(2)
-            if len(ph) != 2:
-                continue
-            pl = 0b0000001111111111 & struct.unpack('<H', ph)[0]
-            if 5 <= pl <= 64:
-                ser.read(pl - 3)
-                ser.timeout = 0.2
-                return ser
-        ser.close()
-        return None
+        ser.reset_output_buffer()
     except Exception:
-        try:
-            ser.close()
-        except Exception:
-            pass
-        return None
+        pass
+    ser.write(DJI_SIM_MODE)
+    ser.flush()
+    time.sleep(0.15)
+    return ser
 
 
 def find_open_serial(forced=None, verbose=True):
-    """Ouvre UNE fois le port protocole et le garde. None si pas prêt."""
+    """Ouvre le port C5 / protocole. Pas de test write/read : ça reset l'USB."""
     if forced:
         try:
-            return serial.Serial(port=forced, timeout=0.2)
+            return open_rc_serial(forced)
         except Exception as e:
             if verbose:
                 print(f'Impossible d\'ouvrir {forced} : {e}')
@@ -218,12 +207,16 @@ def find_open_serial(forced=None, verbose=True):
 
     for port in protocol + other:
         if verbose:
-            print(f'Test du port {port.device} ({port.description}) ...')
-        ser = probe_port(port)
-        if ser is not None:
+            print(f'Ouverture de {port.device} ({port.description}) ...')
+        try:
+            ser = open_rc_serial(port.device)
+        except Exception as e:
             if verbose:
-                print(f'RC-N1 sur {port.device}.')
-            return ser
+                print(f'  Impossible : {e}')
+            continue
+        if verbose:
+            print(f'RC-N1 sur {port.device}.')
+        return ser
     return None
 
 
@@ -243,18 +236,18 @@ def find_port(forced=None, verbose=True):
 
 
 def read_state(ser):
-    """Lit un paquet de mesure DJI (~20 Hz). Ne pas spammer l'USB : la RC
-    se déconnecte (SerialException « multiple access / no data »)."""
-    ser.timeout = 0.15
+    """Demande un paquet sticks, attend jusqu'à 1 s. Pas de spam USB."""
     misses = 0
     while True:
         ser.write(DJI_REQUEST)
+        ser.flush()
         b = ser.read(1)
         if not b:
             misses += 1
-            if misses > 25:
-                raise serial.SerialException('RC muette (débranchée ou port déjà pris)')
-            time.sleep(0.04)
+            if misses > 8:
+                raise serial.SerialException(
+                    'RC muette (débranchée ou port déjà pris)'
+                )
             continue
         misses = 0
         if b != b'\x55':
@@ -264,12 +257,12 @@ def read_state(ser):
             continue
         pl = 0b0000001111111111 & struct.unpack('<H', ph)[0]
         if pl != 38:
-            ser.read(max(pl - 3, 0))
+            if 4 < pl <= 64:
+                ser.read(max(pl - 3, 0))
             continue
         data = b'\x55' + ph + ser.read(pl - 3)
         if len(data) != 38:
             continue
-        time.sleep(0.03)  # ~25 Hz, largement assez pour le V
         return {k: parse_input(data[s:e]) for k, (s, e) in FIELDS.items()}
 
 
@@ -296,33 +289,50 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     target = (args.target, args.udp_port)
 
-    try:
-        # Calibration : demandée explicitement, ou proposée au premier usage.
-        calib = None if args.no_calib else load_calib()
-        if args.calibrate:
+    # Calibration : demandée explicitement, ou proposée au premier usage.
+    calib = None if args.no_calib else load_calib()
+    if args.calibrate:
+        try:
             calib = run_calibration(ser)
-        elif calib is None and not args.no_calib:
-            print('Aucune calibration trouvée. Lance « python dji_host.py --calibrate »')
-            print('pour un centre parfaitement neutre. (Valeurs par défaut utilisées.)\n')
+        except serial.SerialException as e:
+            print(f'Calibration interrompue : {e}')
+            sys.exit(1)
+    elif calib is None and not args.no_calib:
+        print('Aucune calibration trouvée. Lance « python dji_host.py --calibrate »')
+        print('pour un centre parfaitement neutre. (Valeurs par défaut utilisées.)\n')
 
-        print('Lecture des sticks. Ctrl+C pour arrêter.\n')
-
-        last = None
+    print('Lecture des sticks. Ctrl+C pour arrêter.\n')
+    last = None
+    try:
         while True:
-            st = apply_calib(read_state(ser), calib, args.deadzone)
+            try:
+                st = apply_calib(read_state(ser), calib, args.deadzone)
+            except serial.SerialException as e:
+                print(f'\nUSB coupé : {e}')
+                print('Reconnexion dans 2 s...')
+                try:
+                    ser.close()
+                except Exception:
+                    pass
+                time.sleep(2.0)
+                ser = find_open_serial(args.port)
+                if not ser:
+                    print('RC-N1 introuvable.')
+                    sys.exit(1)
+                print(f'Reconnecté sur {ser.port}.')
+                continue
             if args.live:
-                line = f"LX={st['lx']:+6d} LY={st['ly']:+6d} RX={st['rx']:+6d} RY={st['ry']:+6d} CAM={st['cam']:+6d}"
+                line = (
+                    f"LX={st['lx']:+6d} LY={st['ly']:+6d} "
+                    f"RX={st['rx']:+6d} RY={st['ry']:+6d} CAM={st['cam']:+6d}"
+                )
                 if line != last:
                     last = line
                     print(f"\r{line}   ", end='', flush=True)
             else:
-                msg = json.dumps(st).encode()
-                sock.sendto(msg, target)
+                sock.sendto(json.dumps(st).encode(), target)
     except KeyboardInterrupt:
         print('\nArrêt.')
-    except serial.SerialException as e:
-        print(f'\nRadio coupée : {e}')
-        sys.exit(1)
     finally:
         try:
             ser.close()

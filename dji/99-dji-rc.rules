@@ -3,4 +3,6 @@
 #   sudo cp dji/99-dji-rc.rules /etc/udev/rules.d/
 #   sudo udevadm control --reload-rules
 #   sudo udevadm trigger
-ATTRS{idVendor}=="2ca3", ENV{ID_MM_DEVICE_IGNORE}="1"
+# Puis débranche / rebranche la radio.
+ATTRS{idVendor}=="2ca3", ENV{ID_MM_DEVICE_IGNORE}="1", ENV{ID_MM_PORT_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2ca3", MODE="0666"

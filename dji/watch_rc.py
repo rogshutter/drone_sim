@@ -53,6 +53,7 @@ def main():
                 continue
 
             waiting = False
+            time.sleep(1.5)  # laisser l'USB finir de s'annoncer
             cmd = [sys.executable, HOST_PY]
             if not os.path.isfile(CALIB):
                 print("RC branchée — première fois : calibration, puis pilotage.")
