@@ -12,7 +12,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.chdir(HERE)
 
-from dji_host import DJI_VID, get_dji_vid, is_log_interface, is_protocol_interface  # noqa: E402
+from dji_host import (  # noqa: E402
+    DJI_VID,
+    acquire_instance_lock,
+    already_running_message,
+    get_dji_vid,
+    is_log_interface,
+    is_protocol_interface,
+)
 
 HOST_PY = os.path.join(HERE, "dji_host.py")
 CALIB = os.path.join(HERE, "rc_calib.json")
@@ -32,6 +39,11 @@ def rc_plugged():
 
 
 def main():
+    if acquire_instance_lock() is None:
+        already_running_message()
+        return 2
+    os.environ["DJI_RC_WATCH"] = "1"
+
     print()
     print("Veille radio RC-N1")
     print("  Branche la radio (USB-C du dessous) et allume-la quand tu veux.")

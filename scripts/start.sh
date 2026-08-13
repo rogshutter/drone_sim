@@ -111,6 +111,7 @@ echo
 echo "  - Vue 3D          : fenêtre Gazebo si un écran est dispo"
 echo "  - QGroundControl  : UDP port 14550  (ou TCP 127.0.0.1:5760)"
 echo "  - Radio RC-N1     : veille automatique ci-dessous"
+echo "    (ne lance PAS python3 dji/watch_rc.py ailleurs : cette fenêtre le fait)"
 echo
 echo "Arrêt du simulateur : scripts/stop.sh"
 echo

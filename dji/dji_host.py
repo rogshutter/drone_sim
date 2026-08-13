@@ -46,6 +46,40 @@ MAX_OUT = 32767   # plage de sortie envoyée en UDP : ±32767 (centre 0)
 
 # Fichier de calibration, à côté du script (dji/rc_calib.json).
 CALIB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rc_calib.json')
+# Un seul process peut lire la radio. Garder le fd ouvert = lock tenu.
+_LOCK_FD = None
+
+
+def acquire_instance_lock():
+    """None si un autre watch_rc / dji_host tient déjà la radio."""
+    global _LOCK_FD
+    path = (
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '.rc.lock')
+        if os.name == 'nt'
+        else '/tmp/drone-sim-rc.lock'
+    )
+    fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    os.ftruncate(fd, 0)
+    os.write(fd, f'{os.getpid()}\n'.encode())
+    _LOCK_FD = fd
+    return fd
+
+
+def already_running_message():
+    print('La radio est deja lue dans un autre terminal.')
+    print('  1. Va dans cet autre terminal et fais Ctrl+C')
+    print("     (si tu as lance scripts/start.sh, c'est celui-la).")
+    print('  2. Ici, ne relance rien : un seul lecteur, pas deux.')
 
 
 def parse_input(byte):
@@ -161,24 +195,9 @@ def is_protocol_interface(port):
 
 
 def open_rc_serial(port_name):
-    """Ouvre le port comme DjiMini2RCasJoystick (115200 + mode simulateur)."""
-    ser = serial.Serial(
-        port=port_name,
-        baudrate=BAUD,
-        timeout=1.0,
-        write_timeout=1.0,
-        dsrdtr=False,
-        rtscts=False,
-    )
-    time.sleep(0.3)
-    try:
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
-    except Exception:
-        pass
+    """Même ouverture que DjiMini2RCasJoystick : 115200, lecture bloquante."""
+    ser = serial.Serial(port=port_name, baudrate=BAUD)
     ser.write(DJI_SIM_MODE)
-    ser.flush()
-    time.sleep(0.15)
     return ser
 
 
@@ -235,20 +254,10 @@ def find_port(forced=None, verbose=True):
 
 
 def read_state(ser):
-    """Demande un paquet sticks, attend jusqu'à 1 s. Pas de spam USB."""
-    misses = 0
+    """Demande un paquet sticks (lecture bloquante, comme le projet de référence)."""
     while True:
         ser.write(DJI_REQUEST)
-        ser.flush()
         b = ser.read(1)
-        if not b:
-            misses += 1
-            if misses > 8:
-                raise serial.SerialException(
-                    'RC muette (débranchée ou port déjà pris)'
-                )
-            continue
-        misses = 0
         if b != b'\x55':
             continue
         ph = ser.read(2)
@@ -256,7 +265,7 @@ def read_state(ser):
             continue
         pl = 0b0000001111111111 & struct.unpack('<H', ph)[0]
         if pl != 38:
-            if 4 < pl <= 64:
+            if pl > 3:
                 ser.read(max(pl - 3, 0))
             continue
         data = b'\x55' + ph + ser.read(pl - 3)
@@ -278,6 +287,11 @@ def main():
     ap.add_argument('--deadzone', type=float, default=0.03,
                     help='Zone morte au centre (fraction de la course, défaut 0.03)')
     args = ap.parse_args()
+
+    if not os.environ.get('DJI_RC_WATCH'):
+        if acquire_instance_lock() is None:
+            already_running_message()
+            sys.exit(2)
 
     ser = find_open_serial(args.port)
     if not ser:
@@ -304,22 +318,7 @@ def main():
     last = None
     try:
         while True:
-            try:
-                st = apply_calib(read_state(ser), calib, args.deadzone)
-            except serial.SerialException as e:
-                print(f'\nUSB coupé : {e}')
-                print('Reconnexion dans 2 s...')
-                try:
-                    ser.close()
-                except Exception:
-                    pass
-                time.sleep(2.0)
-                ser = find_open_serial(args.port)
-                if not ser:
-                    print('RC-N1 introuvable.')
-                    sys.exit(1)
-                print(f'Reconnecté sur {ser.port}.')
-                continue
+            st = apply_calib(read_state(ser), calib, args.deadzone)
             if args.live:
                 line = (
                     f"LX={st['lx']:+6d} LY={st['ly']:+6d} "
@@ -332,6 +331,9 @@ def main():
                 sock.sendto(json.dumps(st).encode(), target)
     except KeyboardInterrupt:
         print('\nArrêt.')
+    except serial.SerialException as e:
+        print(f'\nRadio coupée : {e}')
+        sys.exit(1)
     finally:
         try:
             ser.close()
