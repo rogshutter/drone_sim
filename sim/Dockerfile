@@ -128,6 +128,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends default-jre-hea
     && ln -sf /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen /usr/local/bin/microxrceddsgen \
     && microxrceddsgen -version || true
 
+# ---------------------------------------------------------------------------
+# Prérequis Python d'ArduPilot (waf + génération MAVLink/DroneCAN). REQUIS AVANT
+# le colcon build de ardupilot_sitl : sinon le waf build échoue tout de suite
+# (génération de code). empy est ÉPINGLÉ car empy 4.x casse le build ArduPilot.
+# ---------------------------------------------------------------------------
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+RUN ln -sf /usr/bin/python3 /usr/bin/python || true \
+    && pip3 install --no-cache-dir empy==3.3.4 future pexpect pymavlink MAVProxy
+
 # 1) le stack ardupilot_gz (SITL+Gazebo+RViz)
 RUN cd /root/ros2_ws \
     && . /opt/ros/jazzy/setup.sh \
@@ -148,7 +157,7 @@ RUN git clone --depth 1 --branch ${ARDUPILOT_VERSION} https://github.com/ArduPil
     && git submodule update --init --recursive --depth 1
 
 RUN ln -sf /usr/bin/python3 /usr/bin/python || true
-RUN pip3 install MAVProxy pymavlink pexpect future empy
+# (Prérequis Python déjà installés plus haut, empy épinglé à 3.3.4.)
 
 RUN cd /ardupilot \
     && ./waf configure --board sitl \
