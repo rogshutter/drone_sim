@@ -43,7 +43,7 @@ from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float64
 from mavros_msgs.msg import OverrideRCIn, State
-from mavros_msgs.srv import SetMode, CommandBool, CommandTOL
+from mavros_msgs.srv import SetMode, CommandBool, CommandTOL, CommandLong, ParamSet
 
 
 def _to_pwm(v):
@@ -90,7 +90,10 @@ class FlightControl(Node):
         # Services MAVROS (arm/désarm, changement de mode, décollage)
         self.cli_mode = self.create_client(SetMode, '/mavros/set_mode')
         self.cli_arm = self.create_client(CommandBool, '/mavros/cmd/arming')
+        self.cli_cmd = self.create_client(CommandLong, '/mavros/cmd/command')
         self.cli_takeoff = self.create_client(CommandTOL, '/mavros/cmd/takeoff')
+        self.cli_param = self.create_client(ParamSet, '/mavros/param/set')
+        self._arming_relaxed = False
 
         # État interne
         self.axes = [0.0] * 5
@@ -123,9 +126,12 @@ class FlightControl(Node):
         """Vrai si les sticks forment un « V » : verticaux bas + horizontaux
         en butée de signes opposés (l'un vers l'autre)."""
         lx, ly, rx, ry = self.axes[0], self.axes[1], self.axes[2], self.axes[3]
-        both_down = (ly < -self.v_down) and (ry < -self.v_down)
+        # Gaz (LY) forcément en bas. Tangage (RY) : butée verticale, les deux
+        # signes existent selon la radio — on n'exige pas le même.
+        throttle_down = ly < -self.v_down
+        pitch_extreme = abs(ry) > self.v_down
         sides = (abs(lx) > self.v_side) and (abs(rx) > self.v_side) and (lx * rx < 0)
-        return both_down and sides
+        return throttle_down and pitch_extreme and sides
 
     def _gesture_fired(self, now):
         """Vrai UNE fois quand le « V » est maintenu assez longtemps (et hors
@@ -156,8 +162,28 @@ class FlightControl(Node):
             self.cli_mode.call_async(req)
             self.get_logger().info(f'-> mode {mode}')
 
+    def _relax_arming(self):
+        """En simu on coupe la checklist (GPS/boussole/RC) : sinon le V est
+        vu mais ArduPilot refuse d'armer."""
+        if self._arming_relaxed or not self.cli_param.service_is_ready():
+            return
+        req = ParamSet.Request()
+        req.param_id = 'ARMING_CHECK'
+        req.value.integer = 0
+        self.cli_param.call_async(req)
+        self._arming_relaxed = True
+        self.get_logger().info('ARMING_CHECK=0 (simu)')
+
     def _arm(self, value):
-        if self.cli_arm.service_is_ready():
+        # 21196 = force-arm ArduPilot (ignore le reste de la checklist).
+        if self.cli_cmd.service_is_ready():
+            req = CommandLong.Request()
+            req.command = 400  # MAV_CMD_COMPONENT_ARM_DISARM
+            req.param1 = 1.0 if value else 0.0
+            req.param2 = 21196.0 if value else 0.0
+            self.cli_cmd.call_async(req)
+            self.get_logger().info('-> arm (force)' if value else '-> disarm')
+        elif self.cli_arm.service_is_ready():
             req = CommandBool.Request()
             req.value = value
             self.cli_arm.call_async(req)
@@ -206,6 +232,7 @@ class FlightControl(Node):
         elif self.phase == ARMING:
             # Séquence non bloquante : GUIDED -> arm -> takeoff, pilotée par l'état.
             self._release_rc()
+            self._relax_arming()
             if mode != 'GUIDED':
                 if self._throttled(now):
                     self._set_mode('GUIDED')

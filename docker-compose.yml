@@ -24,6 +24,13 @@ services:
       - ./sim/models:/sim/models:ro
       - ./sim/worlds:/sim/worlds:ro
       - ./sim/config:/sim/config:ro   # params SITL (dont gazebo-x500.parm)
+      # Nodes pédagogiques en live (symlink-install) : un restart suffit,
+      # pas besoin de reconstruire l'image pour un changement Python.
+      - ./ros/src/flight_control:/root/ros2_ws/src/flight_control
+      - ./ros/src/joy_bridge:/root/ros2_ws/src/joy_bridge
+      - ./ros/src/pid_tuner:/root/ros2_ws/src/pid_tuner
+      - ./ros/src/obstacle_avoid:/root/ros2_ws/src/obstacle_avoid
+      - ./ros/src/drone_launch:/root/ros2_ws/src/drone_launch
     environment:
       - DISPLAY=${DISPLAY:-}                 # vue 3D (RViz/Gazebo) via VcXsrv
       # Le dossier *share* d'ardupilot_gazebo (pas seulement models/) est

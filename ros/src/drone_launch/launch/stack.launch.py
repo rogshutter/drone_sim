@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """stack.launch.py — lance TOUT le simulateur moderne.
 
-- ardupilot_gz_bringup : ArduPilot SITL + Gazebo Harmonic (+ RViz si écran)
+- ardupilot_gz_bringup : ArduPilot SITL + Gazebo Harmonic (une fenêtre 3D)
 - MAVROS : pont MAVLink <-> ROS2 (se connecte au SITL en localhost)
 - nos nodes : joy_bridge (RC-N1 UDP), flight_control (sticks->RC), pid_tuner
-
-RViz (vue 3D) s'ouvre seulement si une variable DISPLAY est présente.
 """
 
 import os
@@ -18,8 +16,6 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    has_display = bool(os.environ.get('DISPLAY'))
-
     # Choix du drone : FRAME=x500 -> notre x500 ArduPilot ; sinon iris (défaut).
     frame = os.environ.get('FRAME', 'iris').lower()
 
@@ -31,18 +27,19 @@ def generate_launch_description():
                 + '/launch/x500_sim.launch.py'
             ),
             launch_arguments={
-                'rviz': 'true' if has_display else 'false',
+                'rviz': 'false',
             }.items(),
         )
     else:
-        # SITL + Gazebo Harmonic (ardupilot_gz_bringup, iris), RViz si écran.
+        # SITL + Gazebo Harmonic (ardupilot_gz_bringup, iris). RViz off :
+        # Gazebo est LA fenêtre 3D. RViz en plus ne fait que brouiller.
         gz = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 get_package_share_directory('ardupilot_gz_bringup')
                 + '/launch/iris_runway.launch.py'
             ),
             launch_arguments={
-                'rviz': 'true' if has_display else 'false',
+                'rviz': 'false',
             }.items(),
         )
 

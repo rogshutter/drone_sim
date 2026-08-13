@@ -85,17 +85,23 @@ else
 fi
 
 echo "[1/3] Docker vérifié (Engine Linux)."
-# Image pré-construite d'abord (téléchargement), build local en repli.
-# REBUILD=1 force la reconstruction locale (après modif du code du conteneur).
+# Image : on ne retélécharge pas si elle est déjà là (le pull vers ghcr.io
+# peut rester coincé 3 min pour rien). PULL=1 force la mise à jour.
+# REBUILD=1 reconstruit localement.
+IMAGE_NAME="${SIM_IMAGE:-ghcr.io/rogshutter/drone_sim:latest}"
 if [ "${REBUILD:-0}" = "1" ]; then
     echo "[2/3] REBUILD=1 : construction locale de l'image..."
     docker compose $COMPOSE_FILES up -d --build
 else
-    echo "[2/3] Récupération de l'image pré-construite (ghcr.io)..."
-    if docker compose $COMPOSE_FILES pull sim; then
-        echo "      Image pré-construite récupérée."
+    if [ "${PULL:-0}" = "1" ] || ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "[2/3] Téléchargement de l'image (ghcr.io)..."
+        if timeout 90 docker compose $COMPOSE_FILES pull sim; then
+            echo "      Image récupérée."
+        else
+            echo "      Téléchargement raté/lent — on utilise l'image locale si elle existe."
+        fi
     else
-        echo "      Image pré-construite indisponible : construction locale (plusieurs minutes)..."
+        echo "[2/3] Image déjà présente, pas de téléchargement (PULL=1 pour mettre à jour)."
     fi
     docker compose $COMPOSE_FILES up -d
 fi
@@ -103,7 +109,7 @@ fi
 echo "[3/3] Simulation lancée !"
 echo
 echo "  - Vue 3D          : fenêtre Gazebo si un écran est dispo"
-echo "  - QGroundControl  : TCP  127.0.0.1  port 5760"
+echo "  - QGroundControl  : UDP port 14550  (ou TCP 127.0.0.1:5760)"
 echo "  - Radio RC-N1     : veille automatique ci-dessous"
 echo
 echo "Arrêt du simulateur : scripts/stop.sh"

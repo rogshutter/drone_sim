@@ -28,8 +28,18 @@ if "%REBUILD%"=="1" (
     echo [2/3] REBUILD=1 : construction locale de l'image ^(plusieurs minutes^)...
     docker compose up -d --build
 ) else (
-    echo [2/3] Recuperation de l'image pre-construite ^(ghcr.io^)...
-    docker compose pull sim
+    docker image inspect ghcr.io/rogshutter/drone_sim:latest >nul 2>nul
+    if errorlevel 1 (
+        echo [2/3] Telechargement de l'image ^(ghcr.io^)...
+        docker compose pull sim
+    ) else (
+        if "%PULL%"=="1" (
+            echo [2/3] PULL=1 : mise a jour de l'image...
+            docker compose pull sim
+        ) else (
+            echo [2/3] Image deja presente, pas de telechargement ^(PULL=1 pour mettre a jour^).
+        )
+    )
     docker compose up -d
 )
 if errorlevel 1 (
