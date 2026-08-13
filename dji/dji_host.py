@@ -221,18 +221,17 @@ def find_open_serial(forced=None, verbose=True):
 
 
 def find_port(forced=None, verbose=True):
-    """Nom du port seulement (sans l'ouvrir). Pour la veille USB."""
+    """Nom du port seulement — sans l'ouvrir (évite de reset l'USB)."""
     if forced:
         return forced
-    ser = find_open_serial(forced, verbose=verbose)
-    if ser is None:
-        return None
-    name = ser.port
-    try:
-        ser.close()
-    except Exception:
-        pass
-    return name
+    for port in serial.tools.list_ports.comports(True):
+        if is_log_interface(port):
+            continue
+        if is_protocol_interface(port) or get_dji_vid(port) == DJI_VID:
+            if verbose:
+                print(f'RC-N1 vue sur {port.device}.')
+            return port.device
+    return None
 
 
 def read_state(ser):
