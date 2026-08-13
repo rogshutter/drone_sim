@@ -119,14 +119,17 @@ RUN cd /root/ros2_ws \
 # ['microxrceddsgen']". On le construit depuis ArduPilot/Micro-XRCE-DDS-Gen
 # (Java + Gradle) et on l'expose sur le PATH.
 # ---------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends default-jre-headless \
+# IMPORTANT : Java 17 (pas 21). Le Gradle 7.6 de Micro-XRCE-DDS-Gen ne supporte
+# pas Java 21 ("Unsupported class file major version 65"). Il faut un JDK
+# (javac) pour compiler le .jar, pas seulement un JRE.
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/* \
     && git clone --recurse-submodules --depth 1 \
        https://github.com/ArduPilot/Micro-XRCE-DDS-Gen.git /root/Micro-XRCE-DDS-Gen \
     && cd /root/Micro-XRCE-DDS-Gen \
-    && ./gradlew assemble \
+    && JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew assemble \
     && ln -sf /root/Micro-XRCE-DDS-Gen/scripts/microxrceddsgen /usr/local/bin/microxrceddsgen \
-    && microxrceddsgen -version || true
+    && test -f /root/Micro-XRCE-DDS-Gen/share/microxrceddsgen/java/microxrceddsgen.jar
 
 # ---------------------------------------------------------------------------
 # Prérequis Python d'ArduPilot (waf + génération MAVLink/DroneCAN). REQUIS AVANT
