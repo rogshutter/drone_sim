@@ -44,6 +44,7 @@ from sensor_msgs.msg import Joy
 from std_msgs.msg import Float64
 from mavros_msgs.msg import OverrideRCIn, State
 from mavros_msgs.srv import SetMode, CommandBool, CommandTOL, CommandLong, ParamSet
+from pymavlink import mavutil
 
 
 def _to_pwm(v):
@@ -94,6 +95,7 @@ class FlightControl(Node):
         self.cli_takeoff = self.create_client(CommandTOL, '/mavros/cmd/takeoff')
         self.cli_param = self.create_client(ParamSet, '/mavros/param/set')
         self._arming_relaxed = False
+        self._mav = None   # lien MAVLink direct (SITL :5762) — secours si MAVROS mute
 
         # État interne
         self.axes = [0.0] * 5
@@ -155,46 +157,81 @@ class FlightControl(Node):
             return True
         return False
 
+    def _mavlink(self):
+        """Connexion unique au SITL. MAVROS voit le mode, mais ses services
+        d'armement restent souvent 'not ready' (CycloneDDS) : on commande ici."""
+        if self._mav is None:
+            self._mav = mavutil.mavlink_connection('tcp:127.0.0.1:5762', autoreconnect=True)
+            try:
+                self._mav.wait_heartbeat(timeout=3)
+            except Exception:
+                self._mav.target_system = 1
+                self._mav.target_component = 1
+            self.get_logger().info(
+                f'MAVLink SITL sys={self._mav.target_system}')
+        return self._mav
+
     def _set_mode(self, mode):
-        if self.cli_mode.service_is_ready():
-            req = SetMode.Request()
-            req.custom_mode = mode
-            self.cli_mode.call_async(req)
-            self.get_logger().info(f'-> mode {mode}')
+        req = SetMode.Request()
+        req.custom_mode = mode
+        self.cli_mode.call_async(req)
+        try:
+            m = self._mavlink()
+            m.set_mode_apm(mode)
+        except Exception as e:
+            self.get_logger().warn(f'mode mavlink: {e}')
+        self.get_logger().info(f'-> mode {mode}')
 
     def _relax_arming(self):
-        """En simu on coupe la checklist (GPS/boussole/RC) : sinon le V est
-        vu mais ArduPilot refuse d'armer."""
-        if self._arming_relaxed or not self.cli_param.service_is_ready():
+        if self._arming_relaxed:
             return
         req = ParamSet.Request()
         req.param_id = 'ARMING_CHECK'
         req.value.integer = 0
         self.cli_param.call_async(req)
+        try:
+            m = self._mavlink()
+            m.mav.param_set_send(
+                m.target_system, m.target_component,
+                b'ARMING_CHECK', 0, mavutil.mavlink.MAV_PARAM_TYPE_INT8)
+        except Exception as e:
+            self.get_logger().warn(f'ARMING_CHECK mavlink: {e}')
         self._arming_relaxed = True
         self.get_logger().info('ARMING_CHECK=0 (simu)')
 
     def _arm(self, value):
-        # 21196 = force-arm ArduPilot (ignore le reste de la checklist).
-        if self.cli_cmd.service_is_ready():
-            req = CommandLong.Request()
-            req.command = 400  # MAV_CMD_COMPONENT_ARM_DISARM
-            req.param1 = 1.0 if value else 0.0
-            req.param2 = 21196.0 if value else 0.0
-            self.cli_cmd.call_async(req)
-            self.get_logger().info('-> arm (force)' if value else '-> disarm')
-        elif self.cli_arm.service_is_ready():
-            req = CommandBool.Request()
-            req.value = value
-            self.cli_arm.call_async(req)
-            self.get_logger().info('-> arm' if value else '-> disarm')
+        req = CommandBool.Request()
+        req.value = value
+        self.cli_arm.call_async(req)
+        req2 = CommandLong.Request()
+        req2.command = 400
+        req2.param1 = 1.0 if value else 0.0
+        req2.param2 = 21196.0 if value else 0.0
+        self.cli_cmd.call_async(req2)
+        try:
+            m = self._mavlink()
+            m.mav.command_long_send(
+                m.target_system, m.target_component,
+                mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
+                1.0 if value else 0.0, 21196.0 if value else 0.0,
+                0, 0, 0, 0, 0)
+        except Exception as e:
+            self.get_logger().warn(f'arm mavlink: {e}')
+        self.get_logger().info('-> arm (force)' if value else '-> disarm')
 
     def _takeoff(self):
-        if self.cli_takeoff.service_is_ready():
-            req = CommandTOL.Request()
-            req.altitude = self.takeoff_alt
-            self.cli_takeoff.call_async(req)
-            self.get_logger().info(f'-> takeoff {self.takeoff_alt:.1f} m')
+        req = CommandTOL.Request()
+        req.altitude = self.takeoff_alt
+        self.cli_takeoff.call_async(req)
+        try:
+            m = self._mavlink()
+            m.mav.command_long_send(
+                m.target_system, m.target_component,
+                mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0,
+                0, 0, 0, 0, 0, 0, self.takeoff_alt)
+        except Exception as e:
+            self.get_logger().warn(f'takeoff mavlink: {e}')
+        self.get_logger().info(f'-> takeoff {self.takeoff_alt:.1f} m')
 
     # ------------------------------------------------------------------- sorties
     def _release_rc(self):
@@ -220,7 +257,7 @@ class FlightControl(Node):
         now = time.monotonic()
         fired = self._gesture_fired(now)
         armed = self.mav.armed
-        mode = self.mav.mode
+        mode = (self.mav.mode or '').upper()
 
         if self.phase == DISARMED:
             self._release_rc()
@@ -233,6 +270,9 @@ class FlightControl(Node):
             # Séquence non bloquante : GUIDED -> arm -> takeoff, pilotée par l'état.
             self._release_rc()
             self._relax_arming()
+            self.get_logger().info(
+                f'ARMING mode={mode!r} armed={armed}',
+                throttle_duration_sec=2.0)
             if mode != 'GUIDED':
                 if self._throttled(now):
                     self._set_mode('GUIDED')
