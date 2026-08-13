@@ -140,16 +140,35 @@ def get_dji_vid(port):
     return None
 
 
-def probe_port(port, timeout=2.0):
+def _desc(port):
+    return (port.description or "").lower()
+
+
+def is_log_interface(port):
+    """Le canal 'Log ACM' de la RC-N1 / C5 n'émet pas les sticks — on ne le sonde pas."""
+    return "log" in _desc(port)
+
+
+def is_protocol_interface(port):
+    d = _desc(port)
+    return any(s in d for s in (
+        "vcom for protocol", "device usb vcom", "v1 acm", "protocol",
+    ))
+
+
+def probe_port(port, timeout=3.0):
     """Ouvre un port candidat et vérifie qu'il répond au protocole DJI."""
     # Attention : port.name est le nom SANS chemin ('ttyACM0'), inutilisable tel
     # quel par serial.Serial. port.device est le chemin complet ('/dev/ttyACM0').
     port_name = port.device if port.device else port.name
     try:
-        ser = serial.Serial(port=port_name, timeout=timeout)
+        ser = serial.Serial(port=port_name, timeout=0.2)
     except Exception:
         return None
     try:
+        time.sleep(0.2)
+        ser.reset_input_buffer()
+        ser.timeout = timeout
         ser.write(DJI_REQUEST)
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -174,35 +193,44 @@ def probe_port(port, timeout=2.0):
         return None
 
 
-def find_port(forced=None):
+def find_port(forced=None, verbose=True):
+    """Trouve le port protocole de la RC. None si absente ou pas encore prête."""
     if forced:
         try:
             ser = serial.Serial(port=forced, timeout=2.0)
             ser.close()
             return forced
         except Exception as e:
-            print(f'Impossible d\'ouvrir le port {forced} : {e}')
-            sys.exit(1)
+            if verbose:
+                print(f'Impossible d\'ouvrir le port {forced} : {e}')
+            return None
 
-    candidates = []
+    protocol, other = [], []
     seen = set()
     for port in serial.tools.list_ports.comports(True):
         if port.device in seen:
             continue
         seen.add(port.device)
-        if 'DJI USB VCOM For Protocol' in port.description or 'DEVICE USB VCOM' in port.description:
-            candidates.insert(0, port)
+        if is_log_interface(port):
+            continue
+        if is_protocol_interface(port):
+            protocol.append(port)
         elif get_dji_vid(port) == DJI_VID:
-            candidates.append(port)
+            other.append(port)
 
-    for port in candidates:
-        print(f'Test du port {port.device} ({port.description}) ...')
+    for port in protocol + other:
+        if verbose:
+            print(f'Test du port {port.device} ({port.description}) ...')
         ser = probe_port(port)
         if ser is not None:
-            print(f'RC-N1 trouvée sur {port.device}.')
+            try:
+                ser.close()
+            except Exception:
+                pass
+            if verbose:
+                print(f'RC-N1 trouvée sur {port.device}.')
             return port.device
-    print('RC-N1 introuvable. Vérifiez le câble (port USB-C du dessous) et l\'allumage.')
-    sys.exit(1)
+    return None
 
 
 def read_state(ser):
@@ -240,23 +268,25 @@ def main():
     args = ap.parse_args()
 
     dev = find_port(args.port)
+    if not dev:
+        print('RC-N1 introuvable. Vérifiez le câble (USB-C du dessous) et l\'allumage.')
+        sys.exit(1)
     ser = serial.Serial(port=dev, timeout=1.0)
-
-    # Calibration : demandée explicitement, ou proposée au premier usage.
-    calib = None if args.no_calib else load_calib()
-    if args.calibrate:
-        calib = run_calibration(ser)
-    elif calib is None and not args.no_calib:
-        print('Aucune calibration trouvée. Lance « python dji_host.py --calibrate »')
-        print('pour un centre parfaitement neutre. (Valeurs par défaut utilisées.)\n')
-
-    print('Lecture des sticks. Ctrl+C pour arrêter.\n')
-
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     target = (args.target, args.udp_port)
 
-    last = None
     try:
+        # Calibration : demandée explicitement, ou proposée au premier usage.
+        calib = None if args.no_calib else load_calib()
+        if args.calibrate:
+            calib = run_calibration(ser)
+        elif calib is None and not args.no_calib:
+            print('Aucune calibration trouvée. Lance « python dji_host.py --calibrate »')
+            print('pour un centre parfaitement neutre. (Valeurs par défaut utilisées.)\n')
+
+        print('Lecture des sticks. Ctrl+C pour arrêter.\n')
+
+        last = None
         while True:
             st = apply_calib(read_state(ser), calib, args.deadzone)
             if args.live:
