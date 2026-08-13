@@ -76,9 +76,9 @@ def acquire_instance_lock():
 
 
 def already_running_message():
-    print('La radio est deja lue dans un autre terminal.')
+    print('La radio est déjà lue dans un autre terminal.')
     print('  1. Va dans cet autre terminal et fais Ctrl+C')
-    print("     (si tu as lance scripts/start.sh, c'est celui-la).")
+    print("     (si tu as lancé scripts/start.sh, c'est celui-là).")
     print('  2. Ici, ne relance rien : un seul lecteur, pas deux.')
 
 
